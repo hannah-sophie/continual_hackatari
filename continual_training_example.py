@@ -14,7 +14,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 import gymnasium as gym
-from gymnasium import logger
+import logging
 import ale_py
 import torch
 import torch.nn as nn
@@ -49,6 +49,14 @@ eval_dir = os.path.join(Path(__file__).parent.parent, "cleanrl_utils/evals/")
 sys.path.insert(1, eval_dir)
 from generic_eval import evaluate  # noqa
 
+logger = logging.getLogger("gymnasium")
+
+if not logger.hasHandlers():
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 # Command line argument configuration using dataclass
 @dataclass
@@ -174,7 +182,7 @@ def make_env(env_id, idx, capture_video, run_dir):
     Creates a gym environment with the specified settings.
     """
     def thunk():
-        #logger.set_level(args.logging_level)
+        logger.setLevel(args.logging_level)
         # Setup environment based on backend type (HackAtari, OCAtari, Gym)
         if args.backend == "HackAtari":
             from hackatari.core import HackAtari
@@ -274,9 +282,9 @@ if __name__ == "__main__":
     rtpt.start()  # Start RTPT tracking
 
     # Set logger level and determine whether to use GPU or CPU for computation
-    #logger.set_level(args.logging_level)
+    logger.setLevel(args.logging_level)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    #logger.debug(f"Using device {device}.")
+    logger.debug(f"Using device {device}.")
 
     # Environment setup
     envs = SubprocVecEnv(
@@ -506,7 +514,7 @@ if __name__ == "__main__":
         "args": vars(args),
     }
     torch.save(model_data, model_path)
-    #logger.info(f"model saved to {model_path} in epoch {epoch}")
+    logger.info(f"model saved to {model_path} in epoch {epoch}")
 
     # Log final model and performance with Weights and Biases if enabled
     if args.track:
