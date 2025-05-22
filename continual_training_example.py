@@ -226,8 +226,9 @@ def make_env(env_id, idx, capture_video, run_dir):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = NoopResetEnv(env, noop_max=30)
         env = EpisodicLifeEnv(env)
-        #if "FIRE" in env.unwrapped.get_action_meanings():
-            #env = FireResetEnv(env)
+        action_meanings = [ale_py.Action(a).name for a in env.unwrapped.ale.getMinimalActionSet()]
+        if "FIRE" in action_meanings:
+            env = FireResetEnv(env)
 
         # If architecture is OCT, apply OCWrapper to environment
         if args.architecture == "OCT":
