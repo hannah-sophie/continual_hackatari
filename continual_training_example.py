@@ -267,7 +267,8 @@ if __name__ == "__main__":
         writer_dir = run.dir
         postfix = dict(url=run.url)
     else:
-        writer_dir = f"{args.wandb_dir}/runs/{run_name}"
+        global_dir = f"{args.wandb_dir }/" if args.wandb_dir is not None else ""
+        writer_dir = f"{global_dir}runs/{run_name}"
         postfix = None
 
     # Initialize Tensorboard SummaryWriter to log metrics and hyperparameters
