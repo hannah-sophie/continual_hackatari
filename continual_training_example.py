@@ -15,12 +15,13 @@ from dataclasses import dataclass
 
 import gymnasium as gym
 from gymnasium import logger
-
+import ale_py
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
+from gymnasium.wrappers.transform_observation import GrayscaleObservation
 from stable_baselines3.common.atari_wrappers import (
     EpisodicLifeEnv,
     FireResetEnv,
@@ -173,7 +174,7 @@ def make_env(env_id, idx, capture_video, run_dir):
     Creates a gym environment with the specified settings.
     """
     def thunk():
-        logger.set_level(args.logging_level)
+        #logger.set_level(args.logging_level)
         # Setup environment based on backend type (HackAtari, OCAtari, Gym)
         if args.backend == "HackAtari":
             from hackatari.core import HackAtari
@@ -187,6 +188,7 @@ def make_env(env_id, idx, capture_video, run_dir):
                 render_mode="rgb_array",
                 frameskip=args.frameskip
             )
+            env.ale = env._env.unwrapped.ale
         elif args.backend == "OCAtari":
             from ocatari.core import OCAtari
             env = OCAtari(
@@ -196,12 +198,13 @@ def make_env(env_id, idx, capture_video, run_dir):
                 obs_mode=args.obs_mode,
                 frameskip=args.frameskip
             )
+            env.ale = env._env.unwrapped.ale
         elif args.backend == "Gym":
             # Use Gym backend with image preprocessing wrappers
             env = gym.make(env_id, render_mode="rgb_array", frameskip=args.frameskip)
             env = gym.wrappers.ResizeObservation(env, (84, 84))
-            env = gym.wrappers.GrayScaleObservation(env)
-            env = gym.wrappers.FrameStack(env, args.buffer_window_size)
+            env = GrayscaleObservation(env)
+            env = gym.wrappers.FrameStackObservation(env, args.buffer_window_size)
         else:
             raise ValueError("Unknown Backend")
 
@@ -215,8 +218,8 @@ def make_env(env_id, idx, capture_video, run_dir):
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = NoopResetEnv(env, noop_max=30)
         env = EpisodicLifeEnv(env)
-        if "FIRE" in env.unwrapped.get_action_meanings():
-            env = FireResetEnv(env)
+        #if "FIRE" in env.unwrapped.get_action_meanings():
+            #env = FireResetEnv(env)
 
         # If architecture is OCT, apply OCWrapper to environment
         if args.architecture == "OCT":
@@ -271,9 +274,9 @@ if __name__ == "__main__":
     rtpt.start()  # Start RTPT tracking
 
     # Set logger level and determine whether to use GPU or CPU for computation
-    logger.set_level(args.logging_level)
+    #logger.set_level(args.logging_level)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    logger.debug(f"Using device {device}.")
+    #logger.debug(f"Using device {device}.")
 
     # Environment setup
     envs = SubprocVecEnv(
@@ -480,7 +483,7 @@ if __name__ == "__main__":
                 writer.add_scalar("charts/Episodic_New_Reward", enewr / count, global_step)
             writer.add_scalar("charts/Episodic_Original_Reward", eorgr / count, global_step)
             writer.add_scalar("charts/Episodic_Length", elength / count, global_step)
-            pbar.set_description(f"Reward: {eorgr.item() / count:.1f}")
+            pbar.set_description(f"Reward: {eorgr if isinstance(eorgr, float) else eorgr.item()/ count:.1f}")
 
         # Log other statistics
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
@@ -503,7 +506,7 @@ if __name__ == "__main__":
         "args": vars(args),
     }
     torch.save(model_data, model_path)
-    logger.info(f"model saved to {model_path} in epoch {epoch}")
+    #logger.info(f"model saved to {model_path} in epoch {epoch}")
 
     # Log final model and performance with Weights and Biases if enabled
     if args.track:
