@@ -116,7 +116,7 @@ tyro==0.5.10
 tzdata==2025.2
 unicodedata2==15.1.0
 urllib3==1.26.15
-wandb==0.13.11
+wandb==0.19
 wcwidth==0.2.13
 Werkzeug==2.2.3
 wheel==0.40.0
