@@ -82,7 +82,7 @@ class Args:
     """the object features to use as observations"""
     buffer_window_size: int = 4
     """length of history in the observations"""
-    backend: str = "OCAtari"
+    backend: str = "HackAtari"
     """Which Backend should we use"""
     modifs: str = ""
     """Modifications for Hackatari"""
@@ -191,10 +191,10 @@ def make_env(env_id, idx, capture_video, run_dir, modifs=""):
         if args.backend == "HackAtari":
             from hackatari.core import HackAtari
 
-            modifs = [i for i in modifs.split(" ") if i]
+            modifs_list = [i for i in modifs.split(" ") if i]
             env = HackAtari(
                 env_id,
-                modifs=modifs,
+                modifs=modifs_list,
                 rewardfunc_path=args.new_rf,
                 obs_mode=args.obs_mode,
                 hud=False,
@@ -623,7 +623,7 @@ if __name__ == "__main__":
             rtpt.step()
 
         # Save the trained model to disk
-        model_path = f"{writer_dir}/{args.exp_name}.cleanrl_model_{modif}"
+        model_path = f"{writer_dir}/{args.exp_name}_{modif}.cleanrl_model"
         model_data = {
             "model_weights": agent.state_dict(),
             "args": vars(args),

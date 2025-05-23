@@ -1,9 +1,9 @@
 {
-    "env_id": "Kangaroo",
+    "env_id": "Freeway",
     "modifs_seq": {
-        "modifs": ["set_kangaroo_position_floor2", ""],
+        "modifs": ["stop_all_cars", "stop_random_car"],
         "learning_rates": [2.5e-4, 2.5e-4],
-        "total_timesteps": [4000, 4000]
+        "total_timesteps": [100000, 100000]
     }
 }
 
