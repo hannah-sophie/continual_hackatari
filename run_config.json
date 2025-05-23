@@ -1,0 +1,11 @@
+{
+    "env_id": "Kangaroo",
+    "modifs_seq": {
+        "modifs": ["set_kangaroo_position_floor2", ""],
+        "learning_rates": [2.5e-4, 2.5e-4],
+        "total_timesteps": [4000, 4000]
+    }
+}
+
+
+
