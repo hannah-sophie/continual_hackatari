@@ -1,6 +1,7 @@
 # project specific
 /runs
 /wandb
+/eval_videos
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
