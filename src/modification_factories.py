@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -18,6 +19,8 @@ class ModificationFactory(ABC):
         """
         pass
 
+    def get_total_timesteps(self):
+        return self.num_total_steps
 
 class NoModificationFactory(ModificationFactory):
     """
@@ -33,12 +36,12 @@ class SequentialModificationFactory(ModificationFactory):
     A modification factory that applies modifications sequentially.
     """
 
-    def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: np.array):
+    def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: List[int]):
         super().__init__(num_total_steps)
-        assert len(modifications) == len(switching_thresholds)- 1, "Number of modifications must match number of switching thresholds minus one."
-        assert switching_thresholds == np.sort(switching_thresholds), "Switching thresholds must be sorted in ascending order."
+        assert len(modifications)-1 == len(switching_thresholds), "Number of modifications must match number of switching thresholds minus one."
+        assert switching_thresholds == sorted(switching_thresholds), "Switching thresholds must be sorted in ascending order."
         self.modifications = modifications
-        switching_thresholds = np.append(switching_thresholds, num_total_steps)
+        switching_thresholds = np.append(np.array(switching_thresholds), num_total_steps)
         self.switching_thresholds = switching_thresholds
 
     def get_modification(self, step):
@@ -71,5 +74,14 @@ class RandomModificationFactory(ModificationFactory):
 
 
 
-    
 
+def get_modification_factory(file_name):
+    with open(file_name) as file:
+        config = json.load(file)
+    modifcation_factory = modification_factory_mapping.get(config.pop("modification_factory"))
+    return modifcation_factory(**config)
+
+
+modification_factory_mapping = {"NoModificationFactory": NoModificationFactory,
+                                "SequentialModificationFactory": SequentialModificationFactory,
+                                "RandomModificationFactory": RandomModificationFactory}
