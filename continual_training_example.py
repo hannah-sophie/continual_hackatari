@@ -590,9 +590,13 @@ if __name__ == "__main__":
             writer.add_scalar(
                 "charts/Episodic_Original_Reward", eorgr / count, global_step
             )
+            modif_name = modif if modif != "" else "no_modif"
             writer.add_scalar(
-                "charts/Episodic_Length", elength / count, global_step
+                f"episodi_reward_by_modif/{modif_name}",
+                eorgr / count,
+                global_step,
             )
+            writer.add_scalar("charts/Episodic_Length", elength / count, global_step)
 
             pbar.set_description(
                 f"Reward: {eorgr if isinstance(eorgr, float) else eorgr.item()/ count:.1f}"
