@@ -315,8 +315,11 @@ def make_agent(envs, device):
 if __name__ == "__main__":
     # Parse command-line arguments using Tyro
     args = tyro.cli(Args)
-    config_path = args.config
-    modification_factory = get_modification_factory(args.config)
+    with open(args.config) as file:
+        config = json.load(file)
+    modification_factory = get_modification_factory(
+        config["modification_factory"], config["modification_factory_kwargs"]
+    )
     args.total_timesteps = modification_factory.get_total_timesteps()
     # Load configuration from file if provided
     # Generate run name based on environment, experiment, seed, and timestamp
@@ -414,9 +417,6 @@ if __name__ == "__main__":
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
 
-
-
-
     pbar = tqdm(range(1, args.num_iterations + 1), postfix=postfix)
     for iteration in pbar:  # Anneal learning rate if specified
         if args.anneal_lr:  # todo what to do with this? look at literature
@@ -442,7 +442,7 @@ if __name__ == "__main__":
             next_obs = envs.reset()
             next_obs = torch.Tensor(next_obs).to(device)
             next_done = torch.zeros(args.num_envs).to(device)
-            #TODO: seeding
+            # TODO: seeding
         # Perform rollout in each environment
         for step in range(0, args.num_steps):
             global_step += args.num_envs

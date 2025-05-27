@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -48,7 +48,7 @@ class SequentialModificationFactory(ModificationFactory):
         assert step < self.num_total_steps, "Step must be less than the total number of steps."
         idx = np.where(step < self.switching_thresholds)[0][0]
         return self.modifications[idx]
-    
+
 
 class RandomModificationFactory(ModificationFactory):
     """
@@ -73,13 +73,11 @@ class RandomModificationFactory(ModificationFactory):
         return self.current_modification
 
 
-
-
-def get_modification_factory(file_name):
-    with open(file_name) as file:
-        config = json.load(file)
-    modifcation_factory = modification_factory_mapping.get(config.pop("modification_factory"))
-    return modifcation_factory(**config)
+def get_modification_factory(
+    modification_factory_name: str, modification_factory_kwargs: Dict[str, Any]
+) -> ModificationFactory:
+    modification_factory = modification_factory_mapping.get(modification_factory_name)
+    return modification_factory(**modification_factory_kwargs)
 
 
 modification_factory_mapping = {"NoModificationFactory": NoModificationFactory,

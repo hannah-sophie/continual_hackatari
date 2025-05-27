@@ -1,8 +1,14 @@
 {
     "modification_factory": "SequentialModificationFactory",
-    "modifications": ["stop_all_cars_edge", "all_cars_black", ""],
-    "switching_thresholds": [2000, 4000],
-    "num_total_steps": 10000
+    "modification_factory_kwargs": {
+        "num_total_steps": 10000,
+        "modifications": [
+            "stop_all_cars_edge",
+            "all_cars_black",
+            ""
+        ],
+        "switching_thresholds": [2000, 4000]
+    }
 }
 
 
