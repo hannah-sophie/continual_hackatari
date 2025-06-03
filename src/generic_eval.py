@@ -1,11 +1,17 @@
-from typing import Callable
-
 import torch
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from src.training_helpers import Args
+from dataclasses import dataclass
 
 
-def evaluate(agent, make_env: Callable, eval_episodes: int, device, **env_kwargs):
-    env = SubprocVecEnv([make_env(idx=0, **env_kwargs)])
+@dataclass
+class EvalArgs(Args):
+    agent_path: str = ""
+    """Path to the agent to be evaluated"""
+    eval_episodes: int = 21
+    """Number of episodes for evaluation"""
+
+
+def evaluate(agent, env, eval_episodes: int, device):
     agent.eval()
     obs = env.reset()
     episodic_returns = []
