@@ -8,6 +8,7 @@ import ale_py
 import gymnasium as gym
 from dataclasses import dataclass
 import os
+import time
 
 
 # Command line argument configuration using dataclass
@@ -18,7 +19,7 @@ class Args:
     """Path to the config file, if set it will override command line arguments"""
 
     # General
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
+    exp_name: str = ""
     """the name of this experiment"""
     seed: int = 42
     """seed of the experiment"""
@@ -259,3 +260,29 @@ def make_agent(envs, args, device):
     else:
         raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
     return agent
+
+
+def init_wandb(args):
+    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+
+    # Initialize tracking with Weights and Biases if enabled
+    if args.track:
+        import wandb
+
+        run = wandb.init(
+            project=args.wandb_project_name,
+            entity=args.wandb_entity,
+            sync_tensorboard=True,
+            config=vars(args),
+            name=run_name,
+            monitor_gym=True,  # True
+            save_code=True,
+            dir=args.wandb_dir,
+        )
+        writer_dir = run.dir
+        postfix = dict(url=run.url)
+    else:
+        global_dir = f"{args.wandb_dir}/" if args.wandb_dir is not None else ""
+        writer_dir = f"{global_dir}runs/{run_name}"
+        postfix = None
+    return writer_dir, postfix

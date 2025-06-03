@@ -13,13 +13,13 @@ import torch.nn as nn
 import torch.optim as optim
 import tyro
 from rtpt import RTPT
-
+import wandb
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.training_helpers import make_env, make_agent, TrainArgs
+from src.training_helpers import make_env, make_agent, TrainArgs, init_wandb
 from src.modification_factories import get_modification_factory
 from src.generic_eval import evaluate  # noqa
 
@@ -46,6 +46,8 @@ global args
 if __name__ == "__main__":
     # Parse command-line arguments using Tyro
     args = tyro.cli(TrainArgs)
+    if args.exp_name == "":
+        args.exp_name = os.path.basename(__file__)[: -len(".py")]
     with open(args.config) as file:
         config = json.load(file)
     modification_factory = get_modification_factory(
@@ -57,25 +59,7 @@ if __name__ == "__main__":
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
-    if args.track:
-        import wandb
-
-        run = wandb.init(
-            project=args.wandb_project_name,
-            entity=args.wandb_entity,
-            sync_tensorboard=True,
-            config=vars(args),
-            name=run_name,
-            monitor_gym=True,  # True
-            save_code=True,
-            dir=args.wandb_dir,
-        )
-        writer_dir = run.dir
-        postfix = dict(url=run.url)
-    else:
-        global_dir = f"{args.wandb_dir }/" if args.wandb_dir is not None else ""
-        writer_dir = f"{global_dir}runs/{run_name}"
-        postfix = None
+    writer_dir, postfix = init_wandb(args)
 
     # Initialize Tensorboard SummaryWriter to log metrics and hyperparameters
     writer = SummaryWriter(writer_dir)
@@ -358,7 +342,8 @@ if __name__ == "__main__":
         list_of_videos = glob.glob(f"{writer_dir}/media/videos/*.mp4")
         latest_video = max(list_of_videos, key=os.path.getctime)
         modif_name = modif if modif != "" else "no_modif"
-        wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
+        if args.track:
+            wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
 
     # Save the trained model to disk
     model_path = f"{writer_dir}/{args.exp_name}.cleanrl_model"
