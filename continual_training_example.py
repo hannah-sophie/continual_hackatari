@@ -9,26 +9,21 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
-import ale_py
-import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
-from gymnasium.wrappers.transform_observation import GrayscaleObservation
 from rtpt import RTPT
-from stable_baselines3.common.atari_wrappers import (
-    EpisodicLifeEnv,
-    FireResetEnv,
-    NoopResetEnv,
-)
+
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from src.training_helpers import make_env, make_agent
 from src.modification_factories import ModificationFactory, get_modification_factory
+from src.generic_eval import evaluate  # noqa
 
 # Suppress warnings to avoid cluttering output
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -46,16 +41,6 @@ if oc_atari_dir is not None:
 # Add the evaluation directory to the Python path to import custom evaluation functions
 eval_dir = os.path.join(Path(__file__).parent.parent, "cleanrl_utils/evals/")
 sys.path.insert(1, eval_dir)
-from generic_eval import evaluate  # noqa
-
-logger = logging.getLogger("gymnasium")
-
-if not logger.hasHandlers():
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    formatter = logging.Formatter("[%(levelname)s] %(message)s")
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
 
 
 # Command line argument configuration using dataclass
@@ -106,8 +91,6 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
     ckpt: str = ""
     """Path to a checkpoint to a model to start training from"""
-    logging_level: int = 40
-    """Logging level for the Gymnasium logger"""
     author: str = "JB"
     """Initials of the author"""
 
@@ -181,137 +164,6 @@ class Args:
 global args
 
 
-# Function to create a gym environment with the specified settings
-def make_env(env_id, idx, capture_video, run_dir, modifs=""):
-    """
-    Creates a gym environment with the specified settings.
-    """
-
-    def thunk():
-        logger.setLevel(args.logging_level)
-        # Setup environment based on backend type (HackAtari, OCAtari, Gym)
-        if args.backend == "HackAtari":
-            from hackatari.core import HackAtari
-
-            modifs_list = [i for i in modifs.split(" ") if i]
-            env = HackAtari(
-                env_id,
-                modifs=modifs_list,
-                rewardfunc_path=args.new_rf,
-                obs_mode=args.obs_mode,
-                hud=False,
-                render_mode="rgb_array",
-                frameskip=args.frameskip,
-            )
-            env.ale = env._env.unwrapped.ale
-        elif args.backend == "OCAtari":
-            from ocatari.core import OCAtari
-
-            env = OCAtari(
-                env_id,
-                hud=False,
-                render_mode="rgb_array",
-                obs_mode=args.obs_mode,
-                frameskip=args.frameskip,
-            )
-            env.ale = env._env.unwrapped.ale
-        elif args.backend == "Gym":
-            # Use Gym backend with image preprocessing wrappers
-            env = gym.make(env_id, render_mode="rgb_array", frameskip=args.frameskip)
-            env = gym.wrappers.ResizeObservation(env, (84, 84))
-            env = GrayscaleObservation(env)
-            env = gym.wrappers.FrameStackObservation(env, args.buffer_window_size)
-        else:
-            raise ValueError("Unknown Backend")
-
-        # Capture video if required
-        if capture_video and idx == 0:
-            env = gym.wrappers.RecordVideo(
-                env, f"{run_dir}/media/videos", disable_logger=True
-            )
-
-        # Apply standard Atari environment wrappers
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        env = NoopResetEnv(env, noop_max=30)
-        env = EpisodicLifeEnv(env)
-        action_meanings = [
-            ale_py.Action(a).name for a in env.unwrapped.ale.getMinimalActionSet()
-        ]
-        if "FIRE" in action_meanings:
-            env = FireResetEnv(env)
-
-        # If architecture is OCT, apply OCWrapper to environment
-        if args.architecture == "OCT":
-            from ocrltransformer.wrappers import OCWrapper
-
-            env = OCWrapper(env)
-
-        return env
-
-    return thunk
-
-
-def make_agent(envs, device):
-    # Define the agent's architecture based on command line arguments
-    if args.architecture == "OCT":
-        from architectures.transformer import OCTransformer as Agent
-
-        agent = Agent(envs, args.emb_dim, args.num_heads, args.num_blocks, device).to(
-            device
-        )
-    elif args.architecture == "VIT":
-        from architectures.transformer import VIT as Agent
-
-        agent = Agent(
-            envs,
-            args.emb_dim,
-            args.num_heads,
-            args.num_blocks,
-            args.patch_size,
-            args.buffer_window_size,
-            device,
-        ).to(device)
-    elif args.architecture == "VIT2":
-        from architectures.transformer import SimpleViT2 as Agent
-
-        agent = Agent(
-            envs,
-            args.emb_dim,
-            args.num_heads,
-            args.num_blocks,
-            args.patch_size,
-            args.buffer_window_size,
-            device,
-        ).to(device)
-    elif args.architecture == "MobileVit":
-        from architectures.transformer import MobileVIT as Agent
-
-        agent = Agent(envs, args.emb_dim, device).to(device)
-    elif args.architecture == "MobileVit2":
-        from architectures.transformer import MobileViT2 as Agent
-
-        agent = Agent(
-            envs,
-            args.emb_dim,
-            args.num_heads,
-            args.num_blocks,
-            args.patch_size,
-            args.buffer_window_size,
-            device,
-        ).to(device)
-    elif args.architecture == "PPO":
-        from architectures.ppo import PPODefault as Agent
-
-        agent = Agent(envs, device).to(device)
-    elif args.architecture == "PPO_OBJ":
-        from architectures.ppo import PPObj as Agent
-
-        agent = Agent(envs, device, args.encoder_dims, args.decoder_dims).to(device)
-    else:
-        raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
-    return agent
-
-
 if __name__ == "__main__":
     # Parse command-line arguments using Tyro
     args = tyro.cli(Args)
@@ -365,17 +217,11 @@ if __name__ == "__main__":
         max_iterations=args.num_iterations,
     )
     rtpt.start()  # Start RTPT tracking
-
-    # Set logger level and determine whether to use GPU or CPU for computation
-    logger.setLevel(args.logging_level)
+    modif = modification_factory.get_modification(0)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    logger.debug(f"Using device {device}.")
-
-    modif  = modification_factory.get_modification(0)
-
     envs = SubprocVecEnv(
         [
-            make_env(args.env_id, i, args.capture_video, writer_dir, modif)
+            make_env(args.env_id, i, args.capture_video, writer_dir, args, modif)
             for i in range(0, args.num_envs)
         ]
     )
@@ -392,7 +238,7 @@ if __name__ == "__main__":
     set_random_seed(args.seed, args.cuda)
     envs.seed(args.seed)
     envs.action_space.seed(args.seed)
-    agent = make_agent(envs, device)
+    agent = make_agent(envs, args, device)
     # TODO what if agent depends on env
 
     # Initialize optimizer for training
@@ -402,9 +248,9 @@ if __name__ == "__main__":
     obs = torch.zeros(
         (args.num_steps, args.num_envs) + envs.observation_space.shape
     ).to(device)
-    actions = torch.zeros(
-        (args.num_steps, args.num_envs) + envs.action_space.shape
-    ).to(device)
+    actions = torch.zeros((args.num_steps, args.num_envs) + envs.action_space.shape).to(
+        device
+    )
     logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
@@ -434,7 +280,9 @@ if __name__ == "__main__":
             modif = new_modif
             envs = SubprocVecEnv(
                 [
-                    make_env(args.env_id, i, args.capture_video, writer_dir, modif)
+                    make_env(
+                        args.env_id, i, args.capture_video, writer_dir, args, modif
+                    )
                     for i in range(0, args.num_envs)
                 ]
             )
@@ -489,13 +337,10 @@ if __name__ == "__main__":
                     nextnonterminal = 1.0 - dones[t + 1]
                     nextvalues = values[t + 1]
                 delta = (
-                    rewards[t]
-                    + args.gamma * nextvalues * nextnonterminal
-                    - values[t]
+                    rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
                 )
                 advantages[t] = lastgaelam = (
-                    delta
-                    + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
                 )
             returns = advantages + values
 
@@ -561,9 +406,7 @@ if __name__ == "__main__":
 
                 # Entropy loss (for exploration)
                 entropy_loss = entropy.mean()
-                loss = (
-                    pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-                )
+                loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
 
                 # Backpropagation and optimizer step
                 optimizer.zero_grad()
@@ -577,9 +420,7 @@ if __name__ == "__main__":
         # Compute explained variance (diagnostic measure for value function fit quality)
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
-        explained_var = (
-            np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-        )
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
         # Log episode statistics for Tensorboard
         if done_in_episode:
@@ -592,7 +433,7 @@ if __name__ == "__main__":
             )
             modif_name = modif if modif != "" else "no_modif"
             writer.add_scalar(
-                f"episodi_reward_by_modif/{modif_name}",
+                f"episodic_reward_by_modif/{modif_name}",
                 eorgr / count,
                 global_step,
             )
@@ -632,7 +473,6 @@ if __name__ == "__main__":
         "args": vars(args),
     }
     torch.save(model_data, model_path)
-    logger.info(f"model saved to {model_path} in epoch {epoch}")
     if args.capture_video:
         import glob
 
@@ -648,8 +488,6 @@ if __name__ == "__main__":
         "args": vars(args),
     }
     torch.save(model_data, model_path)
-    logger.info(f"model saved to {model_path} in epoch {epoch}")
-
     # Log final model and performance with Weights and Biases if enabled
     if args.track:
         # Evaluate agent's performance
@@ -662,6 +500,7 @@ if __name__ == "__main__":
             capture_video=args.capture_video,
             run_dir=writer_dir,
             device=device,
+            args=args,
         )
 
         wandb.log({"FinalReward": np.mean(rewards)})
@@ -677,6 +516,8 @@ if __name__ == "__main__":
                 capture_video=args.capture_video,
                 run_dir=writer_dir,
                 device=device,
+                args=args,
+                modifs=args.modifs,
             )
 
             wandb.log({"HackAtariReward": np.mean(rewards)})

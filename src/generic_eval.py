@@ -16,9 +16,7 @@ def evaluate(agent, make_env: Callable, eval_episodes: int, device, **env_kwargs
             for info in infos:
                 if "episode" not in info:
                     continue
-                print("here")
                 episodic_returns += [info["episode"]["r"]]
-        print(episodic_returns)
         obs = next_obs
 
     return episodic_returns
