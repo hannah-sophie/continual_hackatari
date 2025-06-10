@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import os
 import time
 
+from architectures.ppo import PPO_CBP
+
 
 # Command line argument configuration using dataclass
 @dataclass
@@ -117,6 +119,16 @@ class TrainArgs(Args):
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
     """the target KL divergence threshold"""
+
+    # CPB
+    replacement_rate: float = 1e-5
+    """"""
+    init: str = "kaiming"
+    """"""
+    maturity_threshold: float = 100
+    """"""
+    decay_rate: float = 0.99
+    """"""
 
     # HackAtari testing
     test_modifs: str = ""
@@ -257,6 +269,9 @@ def make_agent(envs, args, device):
         from architectures.ppo import PPObj as Agent
 
         agent = Agent(envs, device, args.encoder_dims, args.decoder_dims).to(device)
+    elif args.architecture == "PPO_CBP":
+        from architectures.ppo import PPO_CBP as Agent
+        agent = PPO_CBP(envs, device, args.replacement_rate, args.init, args.maturity_threshold, args.decay_rate).to(device)
     else:
         raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
     return agent
@@ -285,4 +300,5 @@ def init_wandb(args):
         global_dir = f"{args.wandb_dir}/" if args.wandb_dir is not None else ""
         writer_dir = f"{global_dir}runs/{run_name}"
         postfix = None
-    return writer_dir, postfix
+        run = None
+    return run, writer_dir, postfix

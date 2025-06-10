@@ -59,7 +59,7 @@ if __name__ == "__main__":
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
-    writer_dir, postfix = init_wandb(args)
+    run, writer_dir, postfix = init_wandb(args)
 
     # Initialize Tensorboard SummaryWriter to log metrics and hyperparameters
     writer = SummaryWriter(writer_dir)
@@ -89,7 +89,6 @@ if __name__ == "__main__":
         ]
     )
     envs = VecNormalize(envs, norm_obs=False, norm_reward=True)
-
     # Seeding the environment and PyTorch for reproducibility
     os.environ["PYTHONHASHSEED"] = str(args.seed)
     torch.use_deterministic_algorithms(args.torch_deterministic)
