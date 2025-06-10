@@ -1,11 +1,12 @@
 import numpy as np
-
+import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
-from .common import Predictor, layer_init
-from src.CPB.cbp_linear import CBPLinear
 from src.CPB.cbp_conv import CBPConv
+from src.CPB.cbp_linear import CBPLinear
+
+from .common import Predictor, layer_init
 
 
 class PPODefault(Predictor):
@@ -198,3 +199,29 @@ class PPO_CBP(Predictor):
         if action is None:
             action = probs.sample()
         return action, probs.log_prob(action), probs.entropy(), self.critic(hidden)
+
+
+def shrink_perturb_agent_weights(agent, shrink_factor=0.7, noise_scale=0.01):
+    """
+    Shrink the weights of the agent's network by a specified factor and add noise.
+
+    :param agent: The PPO agent whose weights are to be shrunk.
+    :param shrink_factor: The factor by which to shrink the weights.
+    :param noise_scale: The scale of the noise to be added to the weights.
+    """
+    with torch.no_grad():
+        for param in agent.network.parameters():
+            if param.requires_grad:
+                param.mul_(shrink_factor)
+                noise = torch.randn_like(param) * noise_scale
+                param.add_(noise)
+        for param in agent.actor.parameters():
+            if param.requires_grad:
+                param.mul_(shrink_factor)
+                noise = torch.randn_like(param) * noise_scale
+                param.add_(noise)
+        for param in agent.critic.parameters():
+            if param.requires_grad:
+                param.mul_(shrink_factor)
+                noise = torch.randn_like(param) * noise_scale
+                param.add_(noise)

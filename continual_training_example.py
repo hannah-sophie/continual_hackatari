@@ -1,4 +1,5 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppo_ataripy
+import glob
 import json
 import os
 import random
@@ -6,22 +7,23 @@ import sys
 import time
 import warnings
 from pathlib import Path
-import glob
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
 from rtpt import RTPT
-import wandb
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.training_helpers import make_env, make_agent, TrainArgs, init_wandb
-from src.modification_factories import get_modification_factory
+import wandb
+from architectures.ppo import shrink_perturb_agent_weights
 from src.generic_eval import evaluate  # noqa
+from src.modification_factories import get_modification_factory
+from src.training_helpers import TrainArgs, init_wandb, make_agent, make_env
 
 # Suppress warnings to avoid cluttering output
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -139,6 +141,10 @@ if __name__ == "__main__":
         done_in_episode = False
         new_modif = modification_factory.get_modification(global_step)
         if new_modif != modif:
+            if args.shrink_and_perturb:
+                shrink_perturb_agent_weights(
+                    agent, args.shrink_factor, args.noise_scale
+                )
             modif = new_modif
             envs = SubprocVecEnv(
                 [

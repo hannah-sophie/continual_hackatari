@@ -1,14 +1,15 @@
+import os
+import time
+from dataclasses import dataclass
+
+import ale_py
+import gymnasium as gym
 from gymnasium.wrappers.transform_observation import GrayscaleObservation
 from stable_baselines3.common.atari_wrappers import (
     EpisodicLifeEnv,
     FireResetEnv,
     NoopResetEnv,
 )
-import ale_py
-import gymnasium as gym
-from dataclasses import dataclass
-import os
-import time
 
 from architectures.ppo import PPO_CBP
 
@@ -122,13 +123,22 @@ class TrainArgs(Args):
 
     # CPB
     replacement_rate: float = 1e-5
-    """"""
+    """number of units replaced per step"""
     init: str = "kaiming"
-    """"""
+    """Name of the distribution used to initialize the weights of the network"""
     maturity_threshold: float = 100
-    """"""
+    """number of steps for which a unit is protected from replacement."""
     decay_rate: float = 0.99
-    """"""
+    """controls the quality of the utility estimate"""
+
+    # Shrink and perturb
+    shrink_and_perturb: bool = False
+    """if toggled, the agent's weights will be shrunk and perturbed at each
+    change of modification"""
+    shrink_factor: float = 0.7
+    """the factor by which the agent's weights will be shrunk"""
+    noise_scale: float = 0.01
+    """the scale of the noise to be added to the agent's weights"""
 
     # HackAtari testing
     test_modifs: str = ""
