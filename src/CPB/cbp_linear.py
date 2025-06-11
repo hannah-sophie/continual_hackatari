@@ -64,6 +64,7 @@ class CBPLinear(nn.Module):
             self,
             in_layer: nn.Linear,
             out_layer: nn.Linear,
+            device: torch.device,
             ln_layer: nn.LayerNorm = None,
             bn_layer: nn.BatchNorm1d = None,
             replacement_rate=1e-4,
@@ -100,9 +101,9 @@ class CBPLinear(nn.Module):
         """
         Utility of all features/neurons
         """
-        self.util = nn.Parameter(torch.zeros(self.in_layer.out_features), requires_grad=False)
-        self.ages = nn.Parameter(torch.zeros(self.in_layer.out_features), requires_grad=False)
-        self.accumulated_num_features_to_replace = nn.Parameter(torch.zeros(1), requires_grad=False)
+        self.util = nn.Parameter(torch.zeros(self.in_layer.out_features, device=device), requires_grad=False)
+        self.ages = nn.Parameter(torch.zeros(self.in_layer.out_features, device=device), requires_grad=False)
+        self.accumulated_num_features_to_replace = nn.Parameter(torch.zeros(1, device=device), requires_grad=False)
         """
         Calculate uniform distribution's bound for random feature initialization
         """

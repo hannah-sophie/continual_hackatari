@@ -34,6 +34,7 @@ class CBPConv(nn.Module):
             self,
             in_layer: nn.Conv2d,
             out_layer: [nn.Conv2d, nn.Linear],
+            device: torch.device,
             ln_layer: nn.LayerNorm = None,
             bn_layer: nn.BatchNorm2d = None,
             num_last_filter_outputs=1,
@@ -74,9 +75,9 @@ class CBPConv(nn.Module):
         """
         Utility of all features/neurons
         """
-        self.util = nn.Parameter(torch.zeros(self.in_layer.out_channels), requires_grad=False)
-        self.ages = nn.Parameter(torch.zeros(self.in_layer.out_channels), requires_grad=False)
-        self.accumulated_num_features_to_replace = nn.Parameter(torch.zeros(1), requires_grad=False)
+        self.util = nn.Parameter(torch.zeros(self.in_layer.out_channels, device=device), requires_grad=False)
+        self.ages = nn.Parameter(torch.zeros(self.in_layer.out_channels, device=device), requires_grad=False)
+        self.accumulated_num_features_to_replace = nn.Parameter(torch.zeros(1, device=device), requires_grad=False)
         """
         Calculate uniform distribution's bound for random feature initialization
         """
@@ -123,7 +124,7 @@ class CBPConv(nn.Module):
         if isinstance(self.in_layer, torch.nn.Conv2d) and isinstance(self.out_layer, torch.nn.Linear):
             features_to_replace_output_indices = (
                     (new_features_to_replace * self.num_last_filter_outputs).repeat_interleave(self.num_last_filter_outputs) +
-                    torch.tensor([i for i in range(self.num_last_filter_outputs)]).repeat(new_features_to_replace.size()[0]))
+                    torch.tensor([i for i in range(self.num_last_filter_outputs)],device=self.util.device).repeat(new_features_to_replace.size()[0]))
         return features_to_replace_input_indices, features_to_replace_output_indices
 
     def reinit_features(self, features_to_replace_input_indices, features_to_replace_output_indices):

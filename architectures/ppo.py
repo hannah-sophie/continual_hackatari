@@ -129,6 +129,7 @@ class PPO_CBP(Predictor):
         self.cbp1 = CBPConv(
             in_layer=self.conv1,
             out_layer=self.conv2,
+            device=device,
             replacement_rate=replacement_rate,
             maturity_threshold=maturity_threshold,
             init=init,
@@ -137,6 +138,7 @@ class PPO_CBP(Predictor):
         self.cbp2 = CBPConv(
             in_layer=self.conv2,
             out_layer=self.conv3,
+            device=device,
             replacement_rate=replacement_rate,
             maturity_threshold=maturity_threshold,
             init=init,
@@ -145,6 +147,7 @@ class PPO_CBP(Predictor):
         self.cbp3 = CBPConv(
             in_layer=self.conv3,
             out_layer=self.fct1,
+            device=device,
             num_last_filter_outputs=self.last_filter_output,
             replacement_rate=replacement_rate,
             maturity_threshold=maturity_threshold,
@@ -156,6 +159,7 @@ class PPO_CBP(Predictor):
         self.cbp_actor = CBPLinear(
             in_layer=self.fct1,
             out_layer=self.actor,
+            device=device,
             replacement_rate=replacement_rate,
             maturity_threshold=maturity_threshold,
             init=init,
@@ -165,6 +169,7 @@ class PPO_CBP(Predictor):
         self.cbp_critic = CBPLinear(
             in_layer=self.fct1,
             out_layer=self.critic,
+            device=device,
             replacement_rate=replacement_rate,
             maturity_threshold=maturity_threshold,
             init=init,
@@ -198,7 +203,7 @@ class PPO_CBP(Predictor):
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(hidden)
+        return action, probs.log_prob(action), probs.entropy(), self.critic(self.cbp_critic(hidden))
 
 
 def shrink_perturb_agent_weights(agent, shrink_factor=0.7, noise_scale=0.01):
