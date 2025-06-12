@@ -39,44 +39,35 @@ def log_features(m, i, o):
             m.features = i[0]
         else:
             if m.features is None:
-                #print("Features not initialized")
-                #print("Input", i[0].shape)
                 m.features = (1 - m.decay_rate) * i[0]
             else:
-                #is_printed = False
-                #if m.features.shape != i[0].shape:
-                    #print("Features", m.features.shape)
-                    #print("Input", i[0].shape)
-                    #is_printed = True
                 if m.features.shape != i[0].shape:
                     if i[0].shape[0] < m.features.shape[0]:
-                        nenvs = i[0].shape[0]
-                        steps = m.features.shape[0]//nenvs
-                        new_features = torch.zeros(m.features.shape,device=m.features.device)
-                        for env in range(nenvs):
-                            new_features[env * steps:(env + 1) * steps] = m.features[env * steps:(env + 1) * steps] * m.decay_rate + (1 - m.decay_rate) * i[0][env:env+1]
+                        A = (1 - m.decay_rate) * i[0]
+                        B = m.decay_rate * m.features
                     else:
-                        nenvs = m.features.shape[0]
-                        steps = i[0].shape[0]//nenvs
-                        new_features = torch.zeros(i[0].shape,device=m.features.device)
-                        for env in range(nenvs):
-                            new_features[env * steps:(env + 1) * steps] = m.features[env:env+1] * m.decay_rate + (1 - m.decay_rate) * i[0][env * steps:(env + 1) * steps]
-                    m.features = new_features
+                        A = m.decay_rate * m.features
+                        B = (1 - m.decay_rate) * i[0]
+                    nenvs = A.shape[0]
+                    steps = B.shape[0] // nenvs
+                    B_grouped = B.view(nenvs, steps, *B.shape[1:])
+                    A_expanded = A.unsqueeze(1)
+                    m.features = (A_expanded + B_grouped).view_as(B)
                 else:
                     m.features = m.features * m.decay_rate + (1 - m.decay_rate) * i[0]
-                #if is_printed:
-                    #print("Output", m.features.shape)
-                    #print()
+
 
 def get_layer_bound(layer, init, gain):
     if isinstance(layer, nn.Conv2d):
-        return sqrt(1 / (layer.in_channels * layer.kernel_size[0] * layer.kernel_size[1]))
+        return sqrt(
+            1 / (layer.in_channels * layer.kernel_size[0] * layer.kernel_size[1])
+        )
     elif isinstance(layer, nn.Linear):
-        if init == 'default':
+        if init == "default":
             bound = sqrt(1 / layer.in_features)
-        elif init == 'xavier':
+        elif init == "xavier":
             bound = gain * sqrt(6 / (layer.in_features + layer.out_features))
-        elif init == 'lecun':
+        elif init == "lecun":
             bound = sqrt(3 / layer.in_features)
         else:
             bound = gain * sqrt(3 / layer.in_features)
@@ -85,18 +76,18 @@ def get_layer_bound(layer, init, gain):
 
 class CBPLinear(nn.Module):
     def __init__(
-            self,
-            in_layer: nn.Linear,
-            out_layer: nn.Linear,
-            device: torch.device,
-            ln_layer: nn.LayerNorm = None,
-            bn_layer: nn.BatchNorm1d = None,
-            replacement_rate=1e-4,
-            maturity_threshold=100,
-            init='kaiming',
-            act_type='relu',
-            util_type='contribution',
-            decay_rate=0,
+        self,
+        in_layer: nn.Linear,
+        out_layer: nn.Linear,
+        device: torch.device,
+        ln_layer: nn.LayerNorm = None,
+        bn_layer: nn.BatchNorm1d = None,
+        replacement_rate=1e-4,
+        maturity_threshold=100,
+        init="kaiming",
+        act_type="relu",
+        util_type="contribution",
+        decay_rate=0,
     ):
         super().__init__()
         if type(in_layer) is not nn.Linear:
@@ -125,13 +116,23 @@ class CBPLinear(nn.Module):
         """
         Utility of all features/neurons
         """
-        self.util = nn.Parameter(torch.zeros(self.in_layer.out_features, device=device), requires_grad=False)
-        self.ages = nn.Parameter(torch.zeros(self.in_layer.out_features, device=device), requires_grad=False)
-        self.accumulated_num_features_to_replace = nn.Parameter(torch.zeros(1, device=device), requires_grad=False)
+        self.util = nn.Parameter(
+            torch.zeros(self.in_layer.out_features, device=device), requires_grad=False
+        )
+        self.ages = nn.Parameter(
+            torch.zeros(self.in_layer.out_features, device=device), requires_grad=False
+        )
+        self.accumulated_num_features_to_replace = nn.Parameter(
+            torch.zeros(1, device=device), requires_grad=False
+        )
         """
         Calculate uniform distribution's bound for random feature initialization
         """
-        self.bound = get_layer_bound(layer=self.in_layer, init=init, gain=nn.init.calculate_gain(nonlinearity=act_type))
+        self.bound = get_layer_bound(
+            layer=self.in_layer,
+            init=init,
+            gain=nn.init.calculate_gain(nonlinearity=act_type),
+        )
 
     def forward(self, _input):
         return _input
@@ -146,11 +147,15 @@ class CBPLinear(nn.Module):
         Calculate number of features to replace
         """
         eligible_feature_indices = torch.where(self.ages > self.maturity_threshold)[0]
-        if eligible_feature_indices.shape[0] == 0:  return features_to_replace
+        if eligible_feature_indices.shape[0] == 0:
+            return features_to_replace
 
-        num_new_features_to_replace = self.replacement_rate*eligible_feature_indices.shape[0]
+        num_new_features_to_replace = (
+            self.replacement_rate * eligible_feature_indices.shape[0]
+        )
         self.accumulated_num_features_to_replace += num_new_features_to_replace
-        if self.accumulated_num_features_to_replace < 1:    return features_to_replace
+        if self.accumulated_num_features_to_replace < 1:
+            return features_to_replace
 
         num_new_features_to_replace = int(self.accumulated_num_features_to_replace)
         self.accumulated_num_features_to_replace -= num_new_features_to_replace
@@ -158,11 +163,15 @@ class CBPLinear(nn.Module):
         Calculate feature utility
         """
         output_weight_mag = self.out_layer.weight.data.abs().mean(dim=0)
-        self.util.data = output_weight_mag * self.features.abs().mean(dim=[i for i in range(self.features.ndim - 1)])
+        self.util.data = output_weight_mag * self.features.abs().mean(
+            dim=[i for i in range(self.features.ndim - 1)]
+        )
         """
         Find features with smallest utility
         """
-        new_features_to_replace = torch.topk(-self.util[eligible_feature_indices], num_new_features_to_replace)[1]
+        new_features_to_replace = torch.topk(
+            -self.util[eligible_feature_indices], num_new_features_to_replace
+        )[1]
         new_features_to_replace = eligible_feature_indices[new_features_to_replace]
         features_to_replace = new_features_to_replace
         return features_to_replace
@@ -173,10 +182,14 @@ class CBPLinear(nn.Module):
         """
         with torch.no_grad():
             num_features_to_replace = features_to_replace.shape[0]
-            if num_features_to_replace == 0: return
+            if num_features_to_replace == 0:
+                return
             self.in_layer.weight.data[features_to_replace, :] *= 0.0
-            self.in_layer.weight.data[features_to_replace, :] += \
-                torch.empty(num_features_to_replace, self.in_layer.in_features, device=self.util.device).uniform_(-self.bound, self.bound)
+            self.in_layer.weight.data[features_to_replace, :] += torch.empty(
+                num_features_to_replace,
+                self.in_layer.in_features,
+                device=self.util.device,
+            ).uniform_(-self.bound, self.bound)
             self.in_layer.bias.data[features_to_replace] *= 0
 
             self.out_layer.weight.data[:, features_to_replace] = 0
