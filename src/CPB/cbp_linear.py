@@ -39,10 +39,34 @@ def log_features(m, i, o):
             m.features = i[0]
         else:
             if m.features is None:
+                #print("Features not initialized")
+                #print("Input", i[0].shape)
                 m.features = (1 - m.decay_rate) * i[0]
             else:
-                m.features = m.features * m.decay_rate + (1 - m.decay_rate) * i[0]
-
+                #is_printed = False
+                #if m.features.shape != i[0].shape:
+                    #print("Features", m.features.shape)
+                    #print("Input", i[0].shape)
+                    #is_printed = True
+                if m.features.shape != i[0].shape:
+                    if i[0].shape[0] < m.features.shape[0]:
+                        nenvs = i[0].shape[0]
+                        steps = m.features.shape[0]//nenvs
+                        new_features = torch.zeros(m.features.shape,device=m.features.device)
+                        for env in range(nenvs):
+                            new_features[env * steps:(env + 1) * steps] = m.features[env * steps:(env + 1) * steps] * m.decay_rate + (1 - m.decay_rate) * i[0][env:env+1]
+                    else:
+                        nenvs = m.features.shape[0]
+                        steps = i[0].shape[0]//nenvs
+                        new_features = torch.zeros(i[0].shape,device=m.features.device)
+                        for env in range(nenvs):
+                            new_features[env * steps:(env + 1) * steps] = m.features[env:env+1] * m.decay_rate + (1 - m.decay_rate) * i[0][env * steps:(env + 1) * steps]
+                    m.features = new_features
+                else:
+                    m.features = m.features * m.decay_rate + (1 - m.decay_rate) * i[0]
+                #if is_printed:
+                    #print("Output", m.features.shape)
+                    #print()
 
 def get_layer_bound(layer, init, gain):
     if isinstance(layer, nn.Conv2d):
