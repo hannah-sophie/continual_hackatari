@@ -23,7 +23,7 @@ import wandb
 from architectures.ppo import shrink_perturb_agent_weights
 from src.generic_eval import evaluate  # noqa
 from src.modification_factories import get_modification_factory
-from src.training_helpers import TrainArgs, init_wandb, make_agent, make_env
+from src.training_helpers import TrainArgs, init_wandb, make_agent, make_env, save_agent
 
 # Suppress warnings to avoid cluttering output
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     args.total_timesteps = modification_factory.get_total_timesteps()
     # Load configuration from file if provided
     # Generate run name based on environment, experiment, seed, and timestamp
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = f"{args.env_id}__{args.exp_name}__{args.architecture}{'__shrink_perturb__' if args.shrink_and_perturb else ''}{args.seed}__{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
     run, writer_dir, postfix = init_wandb(args)
@@ -145,6 +145,9 @@ if __name__ == "__main__":
                 shrink_perturb_agent_weights(
                     agent, args.shrink_factor, args.noise_scale
                 )
+            if args.save_agent_with_switch:
+                save_agent(args, agent, modif, run, writer_dir)
+
             modif = new_modif
             envs = SubprocVecEnv(
                 [
@@ -334,13 +337,6 @@ if __name__ == "__main__":
         # Update RTPT for progress tracking
         rtpt.step()
 
-    # Save the trained model to disk
-    model_path = f"{writer_dir}/{args.exp_name}_{modif}.cleanrl_model"
-    model_data = {
-        "model_weights": agent.state_dict(),
-        "args": vars(args),
-    }
-    torch.save(model_data, model_path)
     if args.capture_video:
         import glob
 
@@ -351,12 +347,8 @@ if __name__ == "__main__":
             wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
 
     # Save the trained model to disk
-    model_path = f"{writer_dir}/{args.exp_name}.cleanrl_model"
-    model_data = {
-        "model_weights": agent.state_dict(),
-        "args": vars(args),
-    }
-    torch.save(model_data, model_path)
+    save_agent(args, agent, modif, run, writer_dir)
+    save_agent(args, agent, modif, run, writer_dir, True)
     # Log final model and performance with Weights and Biases if enabled
     if args.track:
         # Evaluate agent's performance
@@ -382,11 +374,6 @@ if __name__ == "__main__":
 
         wandb.log({"FinalReward": np.mean(rewards)})
 
-        if args.save_agent_wandb:
-            artifact = wandb.Artifact('model', type='model')
-            artifact.add_file(model_path)
-            run.log_artifact(artifact)
-
         if args.test_modifs != "":
             args.modifs = args.test_modifs
             args.backend = "HackAtari"
@@ -410,10 +397,6 @@ if __name__ == "__main__":
             )
 
             wandb.log({"HackAtariReward": np.mean(rewards)})
-
-        # Log model to Weights and Biases
-        name = f"{args.exp_name}_s{args.seed}"
-        run.log_model(model_path, name)  # noqa: cannot be undefined
 
         # Log video of agent's performance
         if args.capture_video:

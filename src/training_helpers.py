@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import ale_py
 import gymnasium as gym
+import torch
+import wandb
 from gymnasium.wrappers.transform_observation import GrayscaleObservation
 from stable_baselines3.common.atari_wrappers import (
     EpisodicLifeEnv,
@@ -121,9 +123,12 @@ class TrainArgs(Args):
     target_kl: float = None
     """the target KL divergence threshold"""
 
-    #wandb
+    # save agents
     save_agent_wandb: bool = False
     """if toggled in combination with 'track', the agent will be saved to wandb"""
+    save_agent_with_switch: bool = False
+    """if toggled agent will be saved with every modification switch"""
+
     # CPB
     replacement_rate: float = 1e-5
     """number of units replaced per step"""
@@ -284,7 +289,15 @@ def make_agent(envs, args, device):
         agent = Agent(envs, device, args.encoder_dims, args.decoder_dims).to(device)
     elif args.architecture == "PPO_CBP":
         from architectures.ppo import PPO_CBP as Agent
-        agent = PPO_CBP(envs, device, args.replacement_rate, args.init, args.maturity_threshold, args.decay_rate).to(device)
+
+        agent = PPO_CBP(
+            envs,
+            device,
+            args.replacement_rate,
+            args.init,
+            args.maturity_threshold,
+            args.decay_rate,
+        ).to(device)
     else:
         raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
     return agent
@@ -315,3 +328,20 @@ def init_wandb(args):
         postfix = None
         run = None
     return run, writer_dir, postfix
+
+
+def save_agent(args, agent, modif, run, writer_dir, is_final=False):
+    if is_final:
+        modif_name = "final"
+    else:
+        modif_name = modif if modif != "" else "no_modif"
+    model_path = f"{writer_dir}/{args.exp_name}_{modif_name}.cleanrl_model"
+    model_data = {
+        "model_weights": agent.state_dict(),
+        "args": vars(args),
+    }
+    torch.save(model_data, model_path)
+    if args.track and args.save_agent_wandb:
+        # Log model to Weights and Biases
+        name = f"{args.architecture}{'_shrink_perturb' if args.shrink_perturb else ''}_{modif_name}_{args.exp_name}_s{args.seed}"
+        run.log_model(model_path, name)  # noqa: cannot be undefined
