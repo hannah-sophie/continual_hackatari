@@ -304,7 +304,7 @@ def make_agent(envs, args, device):
 
 
 def init_wandb(args):
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if args.shrink_and_perturb else '__'}{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
     if args.track:
@@ -335,7 +335,8 @@ def save_agent(args, agent, modif, run, writer_dir, is_final=False):
         modif_name = "final"
     else:
         modif_name = modif if modif != "" else "no_modif"
-    model_path = f"{writer_dir}/{args.exp_name}_{modif_name}.cleanrl_model"
+        modif_name = modif_name.replace(" ", "_")
+    model_path = f"{writer_dir}/{args.exp_name}__{args.env_id}__{modif_name}.cleanrl_model"
     model_data = {
         "model_weights": agent.state_dict(),
         "args": vars(args),
@@ -343,5 +344,5 @@ def save_agent(args, agent, modif, run, writer_dir, is_final=False):
     torch.save(model_data, model_path)
     if args.track and args.save_agent_wandb:
         # Log model to Weights and Biases
-        name = f"{args.architecture}{'_shrink_perturb' if args.shrink_perturb else ''}_{modif_name}_{args.exp_name}_s{args.seed}"
+        name = f"{args.exp_name}_s{args.seed}__{args.architecture}{'_shrink_perturb' if args.shrink_and_perturb else ''}__{args.env_id}__{modif_name}"
         run.log_model(model_path, name)  # noqa: cannot be undefined
