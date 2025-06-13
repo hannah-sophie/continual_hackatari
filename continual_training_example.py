@@ -382,6 +382,11 @@ if __name__ == "__main__":
 
         wandb.log({"FinalReward": np.mean(rewards)})
 
+        if args.save_agent_wandb:
+            artifact = wandb.Artifact('model', type='model')
+            artifact.add_file(model_path)
+            run.log_artifact(artifact)
+
         if args.test_modifs != "":
             args.modifs = args.test_modifs
             args.backend = "HackAtari"

@@ -121,6 +121,9 @@ class TrainArgs(Args):
     target_kl: float = None
     """the target KL divergence threshold"""
 
+    #wandb
+    save_agent_wandb: bool = False
+    """if toggled in combination with 'track', the agent will be saved to wandb"""
     # CPB
     replacement_rate: float = 1e-5
     """number of units replaced per step"""
