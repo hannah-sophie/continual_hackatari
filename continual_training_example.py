@@ -58,7 +58,7 @@ if __name__ == "__main__":
     args.total_timesteps = modification_factory.get_total_timesteps()
     # Load configuration from file if provided
     # Generate run name based on environment, experiment, seed, and timestamp
-    run_name = f"{args.env_id}__{args.exp_name}__{args.architecture}{'__shrink_perturb__' if args.shrink_and_perturb else ''}{args.seed}__{int(time.time())}"
+    run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if args.shrink_and_perturb else '__'}{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
     run, writer_dir, postfix = init_wandb(args)
@@ -147,7 +147,15 @@ if __name__ == "__main__":
                 )
             if args.save_agent_with_switch:
                 save_agent(args, agent, modif, run, writer_dir)
-
+                if args.capture_video:
+                    import glob
+                    list_of_videos = glob.glob(f"{writer_dir}/media/videos/*.mp4")
+                    if len(list_of_videos) > 0:
+                        latest_video = max(list_of_videos, key=os.path.getctime)
+                        modif_name = modif if modif != "" else "no_modif"
+                        modif_name = modif_name.replace(" ", "_")
+                        if args.track:
+                            wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
             modif = new_modif
             envs = SubprocVecEnv(
                 [
@@ -303,6 +311,7 @@ if __name__ == "__main__":
                 "charts/Episodic_Original_Reward", eorgr / count, global_step
             )
             modif_name = modif if modif != "" else "no_modif"
+            modif_name = modif_name.replace(" ", "_")
             writer.add_scalar(
                 f"episodic_reward_by_modif/{modif_name}",
                 eorgr / count,
@@ -343,6 +352,7 @@ if __name__ == "__main__":
         list_of_videos = glob.glob(f"{writer_dir}/media/videos/*.mp4")
         latest_video = max(list_of_videos, key=os.path.getctime)
         modif_name = modif if modif != "" else "no_modif"
+        modif_name = modif_name.replace(" ", "_")
         if args.track:
             wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
 
