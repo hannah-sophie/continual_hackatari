@@ -1,11 +1,9 @@
-import os
 import time
 from dataclasses import dataclass
 
 import ale_py
 import gymnasium as gym
 import torch
-import wandb
 from gymnasium.wrappers.transform_observation import GrayscaleObservation
 from stable_baselines3.common.atari_wrappers import (
     EpisodicLifeEnv,
@@ -14,6 +12,7 @@ from stable_baselines3.common.atari_wrappers import (
 )
 
 from architectures.ppo import PPO_CBP
+from src.HER.hindsight_experience_replay import GoalConditionedEnv
 
 
 # Command line argument configuration using dataclass
@@ -139,6 +138,12 @@ class TrainArgs(Args):
     decay_rate: float = 0.99
     """controls the quality of the utility estimate"""
 
+    # HER
+    her: bool = False
+    """if toggled, hindsight experience replay is used with strategy 'final'"""
+    game_specific_goals: bool = False
+    """if toggled game specific goals and reward functions (if defined) are used for HER; otherwise rewards are used as goals"""
+
     # Shrink and perturb
     shrink_and_perturb: bool = False
     """if toggled, the agent's weights will be shrunk and perturbed at each
@@ -184,6 +189,7 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
                 frameskip=args.frameskip,
             )
             env.ale = env._env.unwrapped.ale
+
         elif args.backend == "OCAtari":
             from ocatari.core import OCAtari
 
@@ -195,6 +201,7 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
                 frameskip=args.frameskip,
             )
             env.ale = env._env.unwrapped.ale
+
         elif args.backend == "Gym":
             # Use Gym backend with image preprocessing wrappers
             env = gym.make(env_id, render_mode="rgb_array", frameskip=args.frameskip)
@@ -211,7 +218,7 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
             )
 
         # Apply standard Atari environment wrappers
-        env = gym.wrappers.RecordEpisodeStatistics(env)
+
         env = NoopResetEnv(env, noop_max=30)
         env = EpisodicLifeEnv(env)
         action_meanings = [
@@ -219,7 +226,7 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
         ]
         if "FIRE" in action_meanings:
             env = FireResetEnv(env)
-
+        env = gym.wrappers.RecordEpisodeStatistics(env)
         # If architecture is OCT, apply OCWrapper to environment
         if args.architecture == "OCT":
             from ocrltransformer.wrappers import OCWrapper
@@ -282,7 +289,7 @@ def make_agent(envs, args, device):
     elif args.architecture == "PPO":
         from architectures.ppo import PPODefault as Agent
 
-        agent = Agent(envs, device).to(device)
+        agent = Agent(envs, device, args.her).to(device)
     elif args.architecture == "PPO_OBJ":
         from architectures.ppo import PPObj as Agent
 
@@ -297,6 +304,7 @@ def make_agent(envs, args, device):
             args.init,
             args.maturity_threshold,
             args.decay_rate,
+            args.her
         ).to(device)
     else:
         raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
