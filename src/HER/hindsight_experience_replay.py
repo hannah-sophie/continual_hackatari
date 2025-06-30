@@ -50,6 +50,9 @@ class GoalConditionedEnv(VecEnvWrapper):
             inf["actual_goal"] = actual_goal[i]
         return obs
 
+    def number_of_input_planes(self):
+        return self.her_wrapper.number_of_input_planes()
+
     def append_goal_frame(self, obs, goal=None):
         return self.her_wrapper.append_goal_frame(obs, goal)
 
@@ -108,9 +111,7 @@ class GoalConditionedEnv(VecEnvWrapper):
             action, logprob, _, value = agent.get_action_and_value(x, actions_her[i])
             logprobs_her[i] = logprob
             values_her[i] = value.flatten()
-            desired_goals_her[i] = (
-                torch.tensor(self.her_wrapper.goal).to(device).view(-1)
-            )
+            desired_goals_her[i] = torch.tensor(self.her_wrapper.goal).to(device)
         self.her_wrapper.set_new_goal(current_goal)
 
         return (

@@ -220,14 +220,10 @@ if __name__ == "__main__":
             actions[step] = action
             logprobs[step] = logprob
             if args.her:
-                actual_goals[step] = (
-                    torch.tensor([info["actual_goal"] for info in infos])
-                    .to(device)
-                    .view(-1)
-                )
-                desired_goals[step] = (
-                    torch.tensor(envs.her_wrapper.goal).to(device).view(-1)
-                )
+                actual_goals[step] = torch.tensor(
+                    np.array([np.array(info["actual_goal"]) for info in infos])
+                ).to(device)
+                desired_goals[step] = torch.tensor(envs.her_wrapper.goal).to(device)
             # Execute the game and store reward, next observation, and done flag
             next_obs, reward, next_done, infos = envs.step(action.cpu().numpy())
             rewards[step] = torch.tensor(reward).to(device).view(-1)

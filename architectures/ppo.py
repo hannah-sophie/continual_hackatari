@@ -13,9 +13,11 @@ class PPODefault(Predictor):
     def __init__(self, envs, device, her):
         super().__init__()
         self.device = device
-        # todo update network inputs for first layer when using HER
+        in_channels_conv1 = (
+            envs.number_of_input_planes() if her else envs.observation_space.shape[0]
+        )
         self.network = nn.Sequential(
-            layer_init(nn.Conv2d(4 if her is False else 5, 32, 8, stride=4)),
+            layer_init(nn.Conv2d(in_channels_conv1, 32, 8, stride=4)),
             nn.ReLU(),
             layer_init(nn.Conv2d(32, 64, 4, stride=2)),
             nn.ReLU(),
@@ -118,13 +120,15 @@ class PPO_CBP(Predictor):
         init="default",
         maturity_threshold=100,
         decay_rate=0,
-        her = False
+        her=False,
     ):
         super().__init__()
         self.device = device
-
-        #todo update network inputs for first layer when using HER
-        self.conv1 = layer_init(nn.Conv2d(4 if her is False else 5, 32, 8, stride=4))
+        in_channels_conv1 = (
+            envs.number_of_input_planes() if her else envs.observation_space.shape[0]
+        )
+        # todo update network inputs for first layer when using HER
+        self.conv1 = layer_init(nn.Conv2d(in_channels_conv1, 32, 8, stride=4))
         self.conv2 = layer_init(nn.Conv2d(32, 64, 4, stride=2))
         self.conv3 = layer_init(nn.Conv2d(64, 64, 3, stride=1))
         self.last_filter_output = 7 * 7
@@ -193,7 +197,6 @@ class PPO_CBP(Predictor):
             nn.Flatten(),
             self.fct1,
             nn.ReLU(),
-
         )
         self.act = nn.ReLU()
 
@@ -207,7 +210,12 @@ class PPO_CBP(Predictor):
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(self.cbp_critic(hidden))
+        return (
+            action,
+            probs.log_prob(action),
+            probs.entropy(),
+            self.critic(self.cbp_critic(hidden)),
+        )
 
 
 def shrink_perturb_agent_weights(agent, shrink_factor=0.7, noise_scale=0.01):
