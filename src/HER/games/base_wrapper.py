@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import torch
-from stable_baselines3.common.vec_env import VecNormalize
-
 from src.HER.atari_data import get_human_score
 
 
@@ -21,8 +19,7 @@ class BaseHerWrapper(ABC):
             if hasattr(self.envs, "get_original_reward")
             else original_reward
         )
-        mask = self.goal_equivalence_mask(actual_goal)
-        original_reward = self.goal_reward_fct(mask, original_reward)
+        original_reward = self.goal_reward_fct(actual_goal, original_reward)
         return (
             self.envs.normalize_reward(original_reward)
             if hasattr(self.envs, "get_original_reward")
@@ -32,7 +29,8 @@ class BaseHerWrapper(ABC):
     def goal_equivalence_mask(self, actual_goal):
         return np.all(self.goal == actual_goal, axis=1)
 
-    def goal_reward_fct(self, mask, original_reward):
+    def goal_reward_fct(self, actual_goal, original_reward):
+        mask = self.goal_equivalence_mask(actual_goal)
         original_reward[mask] = (original_reward[mask] + 1) * 2
         return original_reward
 
