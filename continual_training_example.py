@@ -21,9 +21,17 @@ from tqdm import tqdm
 
 import wandb
 from architectures.ppo import shrink_perturb_agent_weights
+from src.HER.hindsight_experience_replay import GoalConditionedEnv
 from src.generic_eval import evaluate  # noqa
 from src.modification_factories import get_modification_factory
-from src.training_helpers import TrainArgs, init_wandb, make_agent, make_env, save_agent
+from src.training_helpers import (
+    TrainArgs,
+    init_wandb,
+    make_agent,
+    make_env,
+    save_agent,
+    compute_gae,
+)
 
 # Suppress warnings to avoid cluttering output
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -91,6 +99,15 @@ if __name__ == "__main__":
         ]
     )
     envs = VecNormalize(envs, norm_obs=False, norm_reward=True)
+
+    if args.her and args.backend not in ["OCAtari", "HackAtari"]:
+        raise ValueError("Her and backend must be either 'OCAtari' or 'HackAtari'")
+
+    if args.her:
+        envs = GoalConditionedEnv(
+            envs, args.num_envs, args.env_id, args.game_specific_goals
+        )
+
     # Seeding the environment and PyTorch for reproducibility
     os.environ["PYTHONHASHSEED"] = str(args.seed)
     torch.use_deterministic_algorithms(args.torch_deterministic)
@@ -117,13 +134,22 @@ if __name__ == "__main__":
     )
     logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
     rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
+
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
-
+    if args.her:
+        original_rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
+        actual_goals = torch.zeros(
+            (args.num_steps, args.num_envs) + envs.get_goal_space_shape()
+        ).to(device)
+        desired_goals = torch.zeros(
+            (args.num_steps, args.num_envs) + envs.get_goal_space_shape()
+        ).to(device)
     # Start training loop
     global_step = 0
     start_time = time.time()
     next_obs = envs.reset()
+    infos = envs.reset_infos
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
 
@@ -138,6 +164,7 @@ if __name__ == "__main__":
         eorgr = 0
         enewr = 0
         count = 0
+
         done_in_episode = False
         new_modif = modification_factory.get_modification(global_step)
         if new_modif != modif:
@@ -149,13 +176,16 @@ if __name__ == "__main__":
                 save_agent(args, agent, modif, run, writer_dir)
                 if args.capture_video:
                     import glob
+
                     list_of_videos = glob.glob(f"{writer_dir}/media/videos/*.mp4")
                     if len(list_of_videos) > 0:
                         latest_video = max(list_of_videos, key=os.path.getctime)
                         modif_name = modif if modif != "" else "no_modif"
                         modif_name = modif_name.replace(" ", "_")
                         if args.track:
-                            wandb.log({f"video_{modif_name}": wandb.Video(latest_video)})
+                            wandb.log(
+                                {f"video_{modif_name}": wandb.Video(latest_video)}
+                            )
             modif = new_modif
             envs = SubprocVecEnv(
                 [
@@ -166,7 +196,12 @@ if __name__ == "__main__":
                 ]
             )
             envs = VecNormalize(envs, norm_obs=False, norm_reward=True)
+            if args.her:
+                envs = GoalConditionedEnv(
+                    envs, args.num_envs, args.env_id, args.game_specific_goals
+                )
             next_obs = envs.reset()
+            infos = envs.reset_infos
             next_obs = torch.Tensor(next_obs).to(device)
             next_done = torch.zeros(args.num_envs).to(device)
             # TODO: seeding
@@ -175,24 +210,42 @@ if __name__ == "__main__":
             global_step += args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
-
             # Get action and value from agent
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(next_obs)
+                x = next_obs
+                if args.her:
+                    x = envs.append_goal_frame(x)
+                action, logprob, _, value = agent.get_action_and_value(x)
                 values[step] = value.flatten()
             actions[step] = action
             logprobs[step] = logprob
-
+            if args.her:
+                actual_goals[step] = (
+                    torch.tensor([info["actual_goal"] for info in infos])
+                    .to(device)
+                    .view(-1)
+                )
+                desired_goals[step] = (
+                    torch.tensor(envs.her_wrapper.goal).to(device).view(-1)
+                )
             # Execute the game and store reward, next observation, and done flag
             next_obs, reward, next_done, infos = envs.step(action.cpu().numpy())
             rewards[step] = torch.tensor(reward).to(device).view(-1)
+            if args.her:
+                original_rewards[step] = (
+                    torch.tensor([info["original_reward"] for info in infos])
+                    .to(device)
+                    .view(-1)
+                )
+
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(
                 next_done
             ).to(device)
 
             # Track episode-level statistics if a game is done
             if 1 in next_done:
-                for info in infos:
+
+                for i, info in enumerate(infos):
                     if "episode" in info:
                         count += 1
                         done_in_episode = True
@@ -202,26 +255,57 @@ if __name__ == "__main__":
                         else:
                             eorgr += info["episode"]["r"]
                         elength += info["episode"]["l"]
-
         # Compute advantages and returns using Generalized Advantage Estimation (GAE)
+
         with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
-            advantages = torch.zeros_like(rewards).to(device)
-            lastgaelam = 0
-            for t in reversed(range(args.num_steps)):
-                if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
-                else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
-                delta = (
-                    rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+            advantages, returns = compute_gae(
+                agent,
+                envs,
+                next_obs,
+                next_done,
+                desired_goals[-1] if args.her else None,
+                rewards,
+                dones,
+                values,
+                args,
+                device,
+            )
+            advantages.detach()
+            returns.detach()
+            if args.her:
+                (
+                    obs_her,
+                    actions_her,
+                    rewards_her,
+                    dones_her,
+                    logprobs_her,
+                    values_her,
+                    desired_goals_her,
+                ) = envs.relabel_trajectories(
+                    agent,
+                    obs,
+                    actions,
+                    original_rewards,
+                    dones,
+                    logprobs,
+                    values,
+                    actual_goals,
+                    device,
                 )
-                advantages[t] = lastgaelam = (
-                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                advantages_her, returns_her = compute_gae(
+                    agent,
+                    envs,
+                    next_obs.detach().clone(),
+                    next_done.detach().clone(),
+                    desired_goals_her[-1] if args.her else None,
+                    rewards_her,
+                    dones_her,
+                    values_her,
+                    args,
+                    device,
                 )
-            returns = advantages + values
+                advantages_her.detach()
+                returns_her.detach()
 
         # Flatten the batch for optimization
         b_obs = obs.reshape((-1,) + envs.observation_space.shape)
@@ -230,7 +314,24 @@ if __name__ == "__main__":
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
+        if args.her:
+            b_obs_her = obs_her.reshape((-1,) + envs.observation_space.shape)
+            b_actions_her = actions_her.reshape((-1,) + envs.action_space.shape)
+            b_logprobs_her = logprobs_her.reshape(-1)
+            b_values_her = values_her.reshape(-1)
+            b_advantages_her = advantages_her.reshape(-1)
+            b_returns_her = returns_her.reshape(-1)
+            b_goal_her = desired_goals_her.reshape((-1,) + envs.get_goal_space_shape())
+            b_goal = desired_goals.reshape((-1,) + envs.get_goal_space_shape())
 
+            b_obs = torch.cat([b_obs, b_obs_her], dim=0)
+            b_actions = torch.cat([b_actions, b_actions_her], dim=0)
+            b_logprobs = torch.cat([b_logprobs, b_logprobs_her], dim=0)
+            b_values = torch.cat([b_values, b_values_her], dim=0)
+            b_advantages = torch.cat([b_advantages, b_advantages_her], dim=0)
+            b_returns = torch.cat([b_returns, b_returns_her], dim=0)
+            # if your policy/V takes goals as input:
+            b_goal = torch.cat([b_goal, b_goal_her], dim=0)
         # Optimize the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
@@ -239,9 +340,11 @@ if __name__ == "__main__":
             for start in range(0, args.batch_size, args.minibatch_size):
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
-
+                x = b_obs[mb_inds]
+                if args.her:
+                    x = envs.append_goal_frame(x, b_goal[mb_inds])
                 _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                    b_obs[mb_inds], b_actions.long()[mb_inds]
+                    x, b_actions.long()[mb_inds]
                 )
                 logratio = newlogprob - b_logprobs[mb_inds]
                 ratio = logratio.exp()
@@ -380,6 +483,7 @@ if __name__ == "__main__":
             env,
             args.eval_episodes,
             device=device,
+            her=args.her,
         )
 
         wandb.log({"FinalReward": np.mean(rewards)})

@@ -304,7 +304,7 @@ def make_agent(envs, args, device):
             args.init,
             args.maturity_threshold,
             args.decay_rate,
-            args.her
+            args.her,
         ).to(device)
     else:
         raise NotImplementedError(f"Architecture {args.architecture} does not exist!")
@@ -344,7 +344,9 @@ def save_agent(args, agent, modif, run, writer_dir, is_final=False):
     else:
         modif_name = modif if modif != "" else "no_modif"
         modif_name = modif_name.replace(" ", "_")
-    model_path = f"{writer_dir}/{args.exp_name}__{args.env_id}__{modif_name}.cleanrl_model"
+    model_path = (
+        f"{writer_dir}/{args.exp_name}__{args.env_id}__{modif_name}.cleanrl_model"
+    )
     model_data = {
         "model_weights": agent.state_dict(),
         "args": vars(args),
@@ -354,3 +356,28 @@ def save_agent(args, agent, modif, run, writer_dir, is_final=False):
         # Log model to Weights and Biases
         name = f"{args.exp_name}_s{args.seed}__{args.architecture}{'_shrink_perturb' if args.shrink_and_perturb else ''}__{args.env_id}__{modif_name}"
         run.log_model(model_path, name)  # noqa: cannot be undefined
+
+
+def compute_gae(
+    agent, envs, next_obs, next_done, next_goal, rewards, dones, values, args, device
+):
+    with torch.no_grad():
+        x = next_obs
+        if args.her:
+            x = envs.append_goal_frame(x, goal=next_goal)
+        next_value = agent.get_value(x).reshape(1, -1)
+        advantages = torch.zeros_like(rewards).to(device)
+        lastgaelam = 0
+        for t in reversed(range(args.num_steps)):
+            if t == args.num_steps - 1:
+                nextnonterminal = 1.0 - next_done
+                nextvalues = next_value
+            else:
+                nextnonterminal = 1.0 - dones[t + 1]
+                nextvalues = values[t + 1]
+            delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+            advantages[t] = lastgaelam = (
+                delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+            )
+        returns = advantages + values
+    return advantages, returns

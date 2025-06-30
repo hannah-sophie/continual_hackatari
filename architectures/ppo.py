@@ -10,11 +10,12 @@ from .common import Predictor, layer_init
 
 
 class PPODefault(Predictor):
-    def __init__(self, envs, device):
+    def __init__(self, envs, device, her):
         super().__init__()
         self.device = device
+        # todo update network inputs for first layer when using HER
         self.network = nn.Sequential(
-            layer_init(nn.Conv2d(4, 32, 8, stride=4)),
+            layer_init(nn.Conv2d(4 if her is False else 5, 32, 8, stride=4)),
             nn.ReLU(),
             layer_init(nn.Conv2d(32, 64, 4, stride=2)),
             nn.ReLU(),
@@ -48,7 +49,7 @@ class PPObj(Predictor):
         layers = nn.ModuleList()
 
         in_dim = dims[-1]
-
+        # todo update network inputs for first layer when using HER
         for l in encoder_dims:
             layers.append(layer_init(nn.Linear(in_dim, l)))
             layers.append(nn.ReLU())
@@ -117,10 +118,13 @@ class PPO_CBP(Predictor):
         init="default",
         maturity_threshold=100,
         decay_rate=0,
+        her = False
     ):
         super().__init__()
         self.device = device
-        self.conv1 = layer_init(nn.Conv2d(4, 32, 8, stride=4))
+
+        #todo update network inputs for first layer when using HER
+        self.conv1 = layer_init(nn.Conv2d(4 if her is False else 5, 32, 8, stride=4))
         self.conv2 = layer_init(nn.Conv2d(32, 64, 4, stride=2))
         self.conv3 = layer_init(nn.Conv2d(64, 64, 3, stride=1))
         self.last_filter_output = 7 * 7
