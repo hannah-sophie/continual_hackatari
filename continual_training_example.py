@@ -477,7 +477,10 @@ if __name__ == "__main__":
                 )
             ]
         )
-
+        if args.her:
+            env = GoalConditionedEnv(
+                env, args.num_envs, args.env_id, args.game_specific_goals
+            )
         rewards = evaluate(
             agent,
             env,
@@ -503,6 +506,10 @@ if __name__ == "__main__":
                     )
                 ]
             )
+            if args.her:
+                env = GoalConditionedEnv(
+                    env, args.num_envs, args.env_id, args.game_specific_goals
+                )
             rewards = evaluate(
                 agent,
                 env,

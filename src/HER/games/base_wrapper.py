@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import torch
+from stable_baselines3.common.vec_env import VecNormalize
+
 from src.HER.atari_data import get_human_score
 
 class BaseHerWrapper(ABC):
@@ -59,10 +61,10 @@ class HerWrapper(BaseHerWrapper):
         return actual_goals
 
     def reward_fct(self, actual_goal, original_reward):
-        original_reward = self.envs.get_original_reward()
+        original_reward = self.envs.get_original_reward() if hasattr(self.envs, "get_original_reward") else original_reward
         idx = np.array((self.goal == actual_goal).nonzero())
         original_reward[tuple(idx.T)] = (original_reward[tuple(idx.T)] + 1) * 2
-        return self.envs.normalize_reward(original_reward)
+        return self.envs.normalize_reward(original_reward) if hasattr(self.envs, "get_original_reward") else original_reward
 
     def goal_space_shape(self):
         return ()
