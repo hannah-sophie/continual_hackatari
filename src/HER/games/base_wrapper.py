@@ -21,13 +21,20 @@ class BaseHerWrapper(ABC):
             if hasattr(self.envs, "get_original_reward")
             else original_reward
         )
-        mask = np.all(self.goal == actual_goal, axis=1)
-        original_reward[mask] = (original_reward[mask] + 1) * 2
+        mask = self.goal_equivalence_mask(actual_goal)
+        original_reward = self.goal_reward_fct(mask, original_reward)
         return (
             self.envs.normalize_reward(original_reward)
             if hasattr(self.envs, "get_original_reward")
             else original_reward
         )
+
+    def goal_equivalence_mask(self, actual_goal):
+        return np.all(self.goal == actual_goal, axis=1)
+
+    def goal_reward_fct(self, mask, original_reward):
+        original_reward[mask] = (original_reward[mask] + 1) * 2
+        return original_reward
 
     @abstractmethod
     def extract_actual_goal(self, obs, info):
