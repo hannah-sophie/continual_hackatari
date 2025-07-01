@@ -106,13 +106,22 @@ _HUMAN_COL = 1
 
 ATARI_GAMES = tuple(sorted(_ATARI_DATA.keys()))
 
+RAM_STATES_POSTIONS = {
+    "frostbite": (102, 100),
+    "kangaroo": (17, 16)
+}
+
+GOAL_POSITIONS = {
+    "frostbite": [123, 0] ,
+    "kangaroo": [118, 0]
+}
+
 
 def get_human_normalized_score(game: str, raw_score: float) -> float:
     """Converts game score to human-normalized score."""
     game_scores = _ATARI_DATA.get(game, (math.nan, math.nan))
     random, human = game_scores[_RANDOM_COL], game_scores[_HUMAN_COL]
     return (raw_score - random) / (human - random)
-
 
 def get_human_score(game: str) -> float:
     game_scores = _ATARI_DATA.get(game, (math.nan, math.nan))
