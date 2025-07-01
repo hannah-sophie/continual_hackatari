@@ -55,7 +55,7 @@ class BaseHerWrapper(ABC):
         num_envs = self.num_envs
         rollout_length = B // num_envs
         env_ids = (
-            torch.arange(num_envs, device=obs.device)
+            torch.arange(num_envs)
             .unsqueeze(1)
             .expand(num_envs, rollout_length)
             .reshape(-1)
@@ -137,7 +137,7 @@ class HerWrapper(BaseHerWrapper):
         if isinstance(new_goal, np.ndarray):
             self.goal = new_goal
         else:
-            self.goal = np.full((self.num_envs, 2), new_goal)
+            self.goal = np.full((self.num_envs, 2), new_goal.cpu().numpy())
 
     def number_of_input_planes(self):
         return self.envs.observation_space.shape[0] + 2

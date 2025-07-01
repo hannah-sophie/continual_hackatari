@@ -88,6 +88,8 @@ class Args:
     # HER
     her: bool = False
     """if toggled, hindsight experience replay is used with strategy 'final'"""
+    game_specific_goals: bool = False
+    """if toggled game specific goals and reward functions (if defined) are used for HER; otherwise rewards are used as goals"""
 
 
 @dataclass
@@ -140,9 +142,6 @@ class TrainArgs(Args):
     """number of steps for which a unit is protected from replacement."""
     decay_rate: float = 0.99
     """controls the quality of the utility estimate"""
-
-    game_specific_goals: bool = False
-    """if toggled game specific goals and reward functions (if defined) are used for HER; otherwise rewards are used as goals"""
 
     # Shrink and perturb
     shrink_and_perturb: bool = False

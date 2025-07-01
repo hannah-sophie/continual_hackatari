@@ -66,6 +66,9 @@ if __name__ == "__main__":
     args.total_timesteps = modification_factory.get_total_timesteps()
     # Load configuration from file if provided
     # Generate run name based on environment, experiment, seed, and timestamp
+    for key, value in config.items():
+        if hasattr(args, key):
+            setattr(args, key, value)
     run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if args.shrink_and_perturb else '__'}{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
@@ -86,7 +89,7 @@ if __name__ == "__main__":
 
     rtpt = RTPT(
         name_initials=args.author,
-        experiment_name="OCALM",
+        experiment_name="CHACK",
         max_iterations=args.num_iterations,
     )
     rtpt.start()  # Start RTPT tracking
@@ -475,7 +478,7 @@ if __name__ == "__main__":
         )
         if args.her:
             env = GoalConditionedEnv(
-                env, args.num_envs, args.env_id, args.game_specific_goals
+                env, 1, args.env_id, args.game_specific_goals
             )
         rewards = evaluate(
             agent,
