@@ -85,6 +85,9 @@ class Args:
     """layer dimensions before nn.Flatten()"""
     decoder_dims: list[int] = (512,)
     """layer dimensions after nn.Flatten()"""
+    # HER
+    her: bool = False
+    """if toggled, hindsight experience replay is used with strategy 'final'"""
 
 
 @dataclass
@@ -138,9 +141,6 @@ class TrainArgs(Args):
     decay_rate: float = 0.99
     """controls the quality of the utility estimate"""
 
-    # HER
-    her: bool = False
-    """if toggled, hindsight experience replay is used with strategy 'final'"""
     game_specific_goals: bool = False
     """if toggled game specific goals and reward functions (if defined) are used for HER; otherwise rewards are used as goals"""
 
@@ -172,7 +172,6 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
     """
     Creates a gym environment with the specified settings.
     """
-
     def thunk():
         # Setup environment based on backend type (HackAtari, OCAtari, Gym)
         if args.backend == "HackAtari":
@@ -288,7 +287,6 @@ def make_agent(envs, args, device):
         ).to(device)
     elif args.architecture == "PPO":
         from architectures.ppo import PPODefault as Agent
-
         agent = Agent(envs, device, args.her).to(device)
     elif args.architecture == "PPO_OBJ":
         from architectures.ppo import PPObj as Agent
@@ -312,7 +310,7 @@ def make_agent(envs, args, device):
 
 
 def init_wandb(args):
-    run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if args.shrink_and_perturb else '__'}{int(time.time())}"
+    run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if isinstance(args, TrainArgs) and args.shrink_and_perturb else '__'}{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
     if args.track:

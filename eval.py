@@ -17,7 +17,7 @@ if __name__ == "__main__":
         args.exp_name = os.path.basename(__file__)[: -len(".py")]
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     modifs_list = [i for i in args.modifs.split(" ") if i]
-    writer_dir, postfix = init_wandb(args)
+    _, writer_dir, postfix = init_wandb(args)
 
     env = SubprocVecEnv(
         [
