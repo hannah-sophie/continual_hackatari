@@ -30,6 +30,30 @@ class NoModificationFactory(ModificationFactory):
     def get_modification(self, step):
         return ""
 
+class EpsSequentialModificationFactory(ModificationFactory):
+    """
+    A modification factory that applies modifications sequentially but selects a random previously seen modification with probability epsilon.
+    """
+
+    def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: List[int], epsilon: float = 0.05, seed=None):
+        super().__init__(num_total_steps)
+        assert len(modifications)-1 == len(switching_thresholds), "Number of modifications must match number of switching thresholds minus one."
+        assert switching_thresholds == sorted(switching_thresholds), "Switching thresholds must be sorted in ascending order."
+        self.modifications = modifications
+        switching_thresholds = np.append(np.array(switching_thresholds), num_total_steps)
+        self.switching_thresholds = switching_thresholds
+        self.epsilon = epsilon
+        self.rng = np.random.default_rng(seed)
+    
+    def get_modification(self, step):
+        assert step < self.num_total_steps, "Step must be less than the total number of steps."
+        idx = np.where(step < self.switching_thresholds)[0][0]
+        if idx > 0 and self.rng.random() < self.epsilon:
+            # Select a random previously seen modification
+            idx = self.rng.Integers(0, idx)
+        return self.modifications[idx]
+
+
 
 class SequentialModificationFactory(ModificationFactory):
     """
@@ -37,17 +61,7 @@ class SequentialModificationFactory(ModificationFactory):
     """
 
     def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: List[int]):
-        super().__init__(num_total_steps)
-        assert len(modifications)-1 == len(switching_thresholds), "Number of modifications must match number of switching thresholds minus one."
-        assert switching_thresholds == sorted(switching_thresholds), "Switching thresholds must be sorted in ascending order."
-        self.modifications = modifications
-        switching_thresholds = np.append(np.array(switching_thresholds), num_total_steps)
-        self.switching_thresholds = switching_thresholds
-
-    def get_modification(self, step):
-        assert step < self.num_total_steps, "Step must be less than the total number of steps."
-        idx = np.where(step < self.switching_thresholds)[0][0]
-        return self.modifications[idx]
+        super().__init__(num_total_steps, modifications, switching_thresholds, epsilon=0)
 
 
 class RandomModificationFactory(ModificationFactory):
@@ -81,5 +95,6 @@ def get_modification_factory(
 
 
 modification_factory_mapping = {"NoModificationFactory": NoModificationFactory,
+                                "EpsSequentialModificationFactory": EpsSequentialModificationFactory,
                                 "SequentialModificationFactory": SequentialModificationFactory,
                                 "RandomModificationFactory": RandomModificationFactory}
