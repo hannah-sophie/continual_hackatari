@@ -70,6 +70,16 @@ class Args:
     architecture: str = "PPO"
     """ Specifies the used architecture"""
 
+    # CPB
+    replacement_rate: float = 1e-5
+    """number of units replaced per step"""
+    init: str = "kaiming"
+    """Name of the distribution used to initialize the weights of the network"""
+    maturity_threshold: float = 100
+    """number of steps for which a unit is protected from replacement."""
+    decay_rate: float = 0.99
+    """controls the quality of the utility estimate"""
+
     # Transformer parameters
     emb_dim: int = 128
     """input embedding size of the transformer"""
@@ -132,16 +142,6 @@ class TrainArgs(Args):
     """if toggled in combination with 'track', the agent will be saved to wandb"""
     save_agent_with_switch: bool = False
     """if toggled agent will be saved with every modification switch"""
-
-    # CPB
-    replacement_rate: float = 1e-5
-    """number of units replaced per step"""
-    init: str = "kaiming"
-    """Name of the distribution used to initialize the weights of the network"""
-    maturity_threshold: float = 100
-    """number of steps for which a unit is protected from replacement."""
-    decay_rate: float = 0.99
-    """controls the quality of the utility estimate"""
 
     # Shrink and perturb
     shrink_and_perturb: bool = False
