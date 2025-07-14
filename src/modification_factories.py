@@ -50,7 +50,7 @@ class EpsSequentialModificationFactory(ModificationFactory):
         idx = np.where(step < self.switching_thresholds)[0][0]
         if idx > 0 and self.rng.random() < self.epsilon:
             # Select a random previously seen modification
-            idx = self.rng.Integers(0, idx)
+            idx = self.rng.integers(0, idx)
         return self.modifications[idx]
 
 
