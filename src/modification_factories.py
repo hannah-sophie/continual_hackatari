@@ -1,3 +1,4 @@
+import itertools
 import json
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
@@ -9,7 +10,7 @@ class ModificationFactory(ABC):
 
     def __init__(self, num_total_steps):
         self.num_total_steps = num_total_steps
-    
+
     @abstractmethod
     def get_modification(self, step):
         """
@@ -22,6 +23,7 @@ class ModificationFactory(ABC):
     def get_total_timesteps(self):
         return self.num_total_steps
 
+
 class NoModificationFactory(ModificationFactory):
     """
     A modification factory that does not apply any modifications.
@@ -30,23 +32,39 @@ class NoModificationFactory(ModificationFactory):
     def get_modification(self, step):
         return ""
 
+
 class EpsSequentialModificationFactory(ModificationFactory):
     """
     A modification factory that applies modifications sequentially but selects a random previously seen modification with probability epsilon.
     """
 
-    def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: List[int], epsilon: float = 0.05, seed=None):
+    def __init__(
+        self,
+        num_total_steps,
+        modifications: List[str],
+        switching_thresholds: List[int],
+        epsilon: float = 0.05,
+        seed=None,
+    ):
         super().__init__(num_total_steps)
-        assert len(modifications)-1 == len(switching_thresholds), "Number of modifications must match number of switching thresholds minus one."
-        assert switching_thresholds == sorted(switching_thresholds), "Switching thresholds must be sorted in ascending order."
+        assert len(modifications) - 1 == len(
+            switching_thresholds
+        ), "Number of modifications must match number of switching thresholds minus one."
+        assert switching_thresholds == sorted(
+            switching_thresholds
+        ), "Switching thresholds must be sorted in ascending order."
         self.modifications = modifications
-        switching_thresholds = np.append(np.array(switching_thresholds), num_total_steps)
+        switching_thresholds = np.append(
+            np.array(switching_thresholds), num_total_steps
+        )
         self.switching_thresholds = switching_thresholds
         self.epsilon = epsilon
         self.rng = np.random.default_rng(seed)
-    
+
     def get_modification(self, step):
-        assert step < self.num_total_steps, "Step must be less than the total number of steps."
+        assert (
+            step < self.num_total_steps
+        ), "Step must be less than the total number of steps."
         idx = np.where(step < self.switching_thresholds)[0][0]
         if idx > 0 and self.rng.random() < self.epsilon:
             # Select a random previously seen modification
@@ -54,14 +72,17 @@ class EpsSequentialModificationFactory(ModificationFactory):
         return self.modifications[idx]
 
 
-
-class SequentialModificationFactory(ModificationFactory):
+class SequentialModificationFactory(EpsSequentialModificationFactory):
     """
     A modification factory that applies modifications sequentially.
     """
 
-    def __init__(self, num_total_steps, modifications: List[str], switching_thresholds: List[int]):
-        super().__init__(num_total_steps, modifications, switching_thresholds, epsilon=0)
+    def __init__(
+        self, num_total_steps, modifications: List[str], switching_thresholds: List[int]
+    ):
+        super().__init__(
+            num_total_steps, modifications, switching_thresholds, epsilon=0
+        )
 
 
 class RandomModificationFactory(ModificationFactory):
@@ -69,7 +90,13 @@ class RandomModificationFactory(ModificationFactory):
     A modification factory that applies modifications randomly.
     """
 
-    def __init__(self, num_total_steps, modifications: List[str], num_repetitions: int = 1, seed=None):
+    def __init__(
+        self,
+        num_total_steps,
+        modifications: List[str],
+        num_repetitions: int = 1,
+        seed=None,
+    ):
         super().__init__(num_total_steps)
         self.modifications = modifications
         self.rng = np.random.default_rng(seed)
@@ -78,7 +105,9 @@ class RandomModificationFactory(ModificationFactory):
         self.current_modification = self.rng.choice(self.modifications)
 
     def get_modification(self, step):
-        assert step < self.num_total_steps, "Step must be less than the total number of steps."
+        assert (
+            step < self.num_total_steps
+        ), "Step must be less than the total number of steps."
         if self.current_repetitions >= self.num_repetitions:
             self.current_modification = self.rng.choice(self.modifications)
             self.current_repetitions = 0
@@ -94,7 +123,102 @@ def get_modification_factory(
     return modification_factory(**modification_factory_kwargs)
 
 
-modification_factory_mapping = {"NoModificationFactory": NoModificationFactory,
-                                "EpsSequentialModificationFactory": EpsSequentialModificationFactory,
-                                "SequentialModificationFactory": SequentialModificationFactory,
-                                "RandomModificationFactory": RandomModificationFactory}
+class AllCombinationsRandomModificationFactory(RandomModificationFactory):
+    "ModificationFactory selecting for multiple sets of random modifications all combinations of these sets randomly"
+
+    def __init__(
+        self,
+        num_total_steps,
+        modifications: List[List[str]],
+        num_repetitions: int = 1,
+        seed=None,
+    ):
+        super().__init__(
+            num_total_steps,
+            [" ".join(list(m)) for m in itertools.product(*modifications)],
+            num_repetitions,
+            seed,
+        )
+
+
+class EpsCombinedModificationFactory(ModificationFactory):
+    """
+    A modification factory where one can combine several base modification factories. Previously completed modifs are selected randomly.
+    """
+
+    def __init__(
+        self,
+        modification_factory_kwargs: Dict[str, dict],
+        epsilon: float = 0.05,
+        seed=None,
+    ):
+        super().__init__(
+            sum(
+                [
+                    modification_factory_kwargs[key]["num_total_steps"]
+                    for key in modification_factory_kwargs
+                ]
+            )
+        )
+        self.all_modification_kwargs = modification_factory_kwargs
+        self.all_modification_factories = list(modification_factory_kwargs.keys())
+        self.completed_steps, self.completed_modifs = 0, []
+        self.current_modification, self.current_modification_factory = None, None
+
+        self.epsilon = epsilon
+        self.rng = np.random.default_rng(seed)
+
+        self.set_current_modification_factory()
+
+    def set_current_modification_factory(self):
+        if self.current_modification is not None:
+            self.completed_steps += self.all_modification_kwargs[
+                self.current_modification
+            ]["num_total_steps"]
+            self.completed_modifs += self.all_modification_kwargs[
+                self.current_modification
+            ]["modifications"]
+
+        self.current_modification = self.all_modification_factories.pop(0)
+        assert (
+            "CombinedModificationFactory" not in self.current_modification
+        ), "No deep nesting of ModificationFactories allowed"
+        self.current_modification_factory = get_modification_factory(
+            self.current_modification,
+            self.all_modification_kwargs[self.current_modification],
+        )
+        if hasattr(self.current_modification_factory, "rng"):
+            self.current_modification_factory.rng = self.rng
+
+    def get_modification(self, step):
+        assert (
+            step < self.num_total_steps
+        ), "Step must be less than the total number of steps."
+        step = step - self.completed_steps
+        if step > self.current_modification_factory.num_total_steps:
+            self.set_current_modification_factory()
+            step = step - self.completed_steps
+
+        if self.rng.random() < self.epsilon:
+            return self.rng.choice(self.completed_modifs)
+        return self.current_modification_factory.get_modification(step)
+
+
+class CombinedModificationFactory(EpsCombinedModificationFactory):
+    """
+    A modification factory where one can combine several base modification factories.
+    """
+
+    def __init__(self, modification_factory_kwargs: Dict[str, dict]):
+        super().__init__(modification_factory_kwargs, epsilon=0)
+
+
+modification_factory_mapping = {
+    "NoModificationFactory": NoModificationFactory,
+    "EpsSequentialModificationFactory": EpsSequentialModificationFactory,
+    "SequentialModificationFactory": SequentialModificationFactory,
+    "RandomModificationFactory": RandomModificationFactory,
+    "AllCombinationsRandomModificationFactory": AllCombinationsRandomModificationFactory,
+    "EpsCombinedModificationFactory": EpsCombinedModificationFactory,
+    "CombinedModificationFactory": CombinedModificationFactory,
+}
