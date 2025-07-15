@@ -67,8 +67,8 @@ if __name__ == "__main__":
     # Load configuration from file if provided
     # Generate run name based on environment, experiment, seed, and timestamp
     for key, value in config.items():
-        if hasattr(args, key):
-            setattr(args, key, value)
+        setattr(args, key, value)
+
     run_name = f"{args.env_id}_s{args.seed}__{args.exp_name}__{args.architecture}{'_shrink_perturb__' if args.shrink_and_perturb else '__'}{int(time.time())}"
 
     # Initialize tracking with Weights and Biases if enabled
