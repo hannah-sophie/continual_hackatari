@@ -131,20 +131,20 @@ class HerWrapper(BaseHerWrapper):
         return actual_goal
 
     def goal_space_shape(self):
-        return (2,)
+        return (len(self.goal_position),)
 
     def set_new_goal(self, new_goal):
         if isinstance(new_goal, np.ndarray):
             self.goal = new_goal
         else:
-            self.goal = np.full((self.num_envs, 2), new_goal.cpu().numpy())
+            self.goal = np.full((self.num_envs, len(self.goal_position)), new_goal.cpu().numpy())
 
     def number_of_input_planes(self):
-        return self.envs.observation_space.shape[0] + 2
+        return self.envs.observation_space.shape[0] + len(self.goal_position)
 
     def normalize_goal(self, goal):
         return goal
 
     def sample_new_goal(self):
-        self.goal = np.full((self.num_envs, 2), self.goal_position)
+        self.goal = np.full((self.num_envs, len(self.goal_position)), self.goal_position)
         return self.goal

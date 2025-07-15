@@ -108,12 +108,14 @@ ATARI_GAMES = tuple(sorted(_ATARI_DATA.keys()))
 
 RAM_STATES_POSTIONS = {
     "frostbite": (102, 100),
-    "kangaroo": (17, 16)
+    "kangaroo": (17, 16),
+    "freeway": (15,)
 }
 
 GOAL_POSITIONS = {
     "frostbite": [123, 0] ,
-    "kangaroo": [118, 0]
+    "kangaroo": [118, 0],
+    "freeway": [176]
 }
 
 
