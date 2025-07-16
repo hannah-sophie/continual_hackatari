@@ -44,7 +44,6 @@ class EpsSequentialModificationFactory(ModificationFactory):
         modifications: List[str],
         switching_thresholds: List[int],
         epsilon: float = 0.05,
-        seed=None,
     ):
         super().__init__(num_total_steps)
         assert len(modifications) - 1 == len(
@@ -59,16 +58,15 @@ class EpsSequentialModificationFactory(ModificationFactory):
         )
         self.switching_thresholds = switching_thresholds
         self.epsilon = epsilon
-        self.rng = np.random.default_rng(seed)
 
     def get_modification(self, step):
         assert (
             step < self.num_total_steps
         ), "Step must be less than the total number of steps."
         idx = np.where(step < self.switching_thresholds)[0][0]
-        if idx > 0 and self.rng.random() < self.epsilon:
+        if idx > 0 and np.random.rand() < self.epsilon:
             # Select a random previously seen modification
-            idx = self.rng.integers(0, idx)
+            idx = np.random.randint(0, idx)
         return self.modifications[idx]
 
 
@@ -95,21 +93,19 @@ class RandomModificationFactory(ModificationFactory):
         num_total_steps,
         modifications: List[str],
         num_repetitions: int = 1,
-        seed=None,
     ):
         super().__init__(num_total_steps)
         self.modifications = modifications
-        self.rng = np.random.default_rng(seed)
         self.num_repetitions = num_repetitions
         self.current_repetitions = 0
-        self.current_modification = self.rng.choice(self.modifications)
+        self.current_modification = np.random.choice(self.modifications)
 
     def get_modification(self, step):
         assert (
             step < self.num_total_steps
         ), "Step must be less than the total number of steps."
         if self.current_repetitions >= self.num_repetitions:
-            self.current_modification = self.rng.choice(self.modifications)
+            self.current_modification = np.random.choice(self.modifications)
             self.current_repetitions = 0
         else:
             self.current_repetitions += 1
@@ -131,13 +127,11 @@ class AllCombinationsRandomModificationFactory(RandomModificationFactory):
         num_total_steps,
         modifications: List[List[str]],
         num_repetitions: int = 1,
-        seed=None,
     ):
         super().__init__(
             num_total_steps,
             [" ".join(list(m)) for m in itertools.product(*modifications)],
             num_repetitions,
-            seed,
         )
 
 
@@ -150,7 +144,6 @@ class EpsCombinedModificationFactory(ModificationFactory):
         self,
         modification_factory_kwargs: Dict[str, dict],
         epsilon: float = 0.05,
-        seed=None,
     ):
         super().__init__(
             sum(
@@ -166,7 +159,6 @@ class EpsCombinedModificationFactory(ModificationFactory):
         self.current_modification, self.current_modification_factory = None, None
 
         self.epsilon = epsilon
-        self.rng = np.random.default_rng(seed)
 
         self.set_current_modification_factory()
 
@@ -187,8 +179,6 @@ class EpsCombinedModificationFactory(ModificationFactory):
             self.current_modification,
             self.all_modification_kwargs[self.current_modification],
         )
-        if hasattr(self.current_modification_factory, "rng"):
-            self.current_modification_factory.rng = self.rng
 
     def get_modification(self, step):
         assert (
@@ -199,8 +189,8 @@ class EpsCombinedModificationFactory(ModificationFactory):
             self.set_current_modification_factory()
             step = step - self.completed_steps
 
-        if self.rng.random() < self.epsilon:
-            return self.rng.choice(self.completed_modifs)
+        if np.random.rand() < self.epsilon:
+            return np.random.choice(self.completed_modifs)
         return self.current_modification_factory.get_modification(step)
 
 
