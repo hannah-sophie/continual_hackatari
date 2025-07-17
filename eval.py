@@ -1,11 +1,13 @@
 import glob
 import os
+import re
 
 import numpy as np
 import torch
 import tyro
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+from src.HER.hindsight_experience_replay import GoalConditionedEnv
 from src.training_helpers import make_agent, make_env, init_wandb
 from src.generic_eval import evaluate, EvalArgs
 
@@ -17,8 +19,11 @@ if __name__ == "__main__":
         args.exp_name = os.path.basename(__file__)[: -len(".py")]
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     modifs_list = [i for i in args.modifs.split(" ") if i]
-    _, writer_dir, postfix = init_wandb(args)
-
+    _, writer_dir, postfix = init_wandb(args, job_type="eval")
+    ckpt = torch.load(args.agent_path, map_location=torch.device("cpu"))
+    model_args = ckpt["args"]
+    args.her = model_args["her"]
+    args.num_envs = 1
     env = SubprocVecEnv(
         [
             make_env(
@@ -31,14 +36,19 @@ if __name__ == "__main__":
             )
         ]
     )
+    if args.her and args.backend not in ["OCAtari", "HackAtari"]:
+        raise ValueError("Her and backend must be either 'OCAtari' or 'HackAtari'")
+
+    if args.her:
+        env = GoalConditionedEnv(
+            env, args.num_envs, args.env_id, args.game_specific_goals
+        )
 
     obs = env.reset()
     agent = make_agent(env, args, device)
-
-    ckpt = torch.load(args.agent_path, map_location=torch.device("cpu"))
     agent.load_state_dict(ckpt["model_weights"])
 
-    episode_rewards = evaluate(agent, env, args.eval_episodes, device)
+    episode_rewards = evaluate(agent, env, args.eval_episodes, device,her=args.her)
     mean_reward = np.mean(episode_rewards)
     std_reward = np.std(episode_rewards)
     print(f"{mean_reward} +- {std_reward}")
