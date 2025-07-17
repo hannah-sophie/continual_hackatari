@@ -1,8 +1,8 @@
 #!/bin/bash
-CUDA_DEVICE=2
 RUN_CONFIG_PATH="run_config.json"
 ENV_ID="Freeway"
 SEEDS=(0 1 2)
+AVAILABLE_GPUS=(1 2 3)
 AUTHOR="LR"
 
 run_training() {
@@ -19,25 +19,34 @@ run_training() {
         --capture_video \
         --author "$AUTHOR" \
     
-    echo "Completed evaluation for seed: $seed"
+    echo "Completed evaluation for seed: $seed on GPU $gpu_id"
 }
 
 export -f run_training
 export RUN_CONFIG_PATH AUTHOR ENV_ID
+num_seeds=${#SEEDS[@]}
+num_gpus=${#AVAILABLE_GPUS[@]}
 
-# Check if GNU parallel is available
-if command -v parallel &> /dev/null; then
-    echo "Using GNU parallel for concurrent execution..."
+pids=()
+
+for i in "${!SEEDS[@]}"; do
+    seed=${SEEDS[$i]}
+    gpu_idx=$((i % num_gpus))
+    gpu_id=${AVAILABLE_GPUS[$gpu_idx]}
     
-    printf '%s\n' "${SEEDS[@]}" | parallel -j $(nproc) run_training {} $CUDA_DEVICE
+    if [ ${#pids[@]} -ge $num_gpus ]; then
+        wait ${pids[0]}
+        pids=("${pids[@]:1}")  # Remove first element
+    fi
     
-else
-    echo "GNU parallel not found."
-    for seed in "${SEEDS[@]}"; do
-        run_training "$seed" "$CUDA_DEVICE" &
-    done
+    run_training "$seed" "$gpu_id" &
+    pids+=($!)
     
-    wait
-fi
+    echo "Launched seed $seed on GPU $gpu_id (PID: $!)"
+done
+
+for pid in "${pids[@]}"; do
+    wait $pid
+done
 
 echo "All evaluations completed!"
