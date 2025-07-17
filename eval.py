@@ -19,11 +19,19 @@ if __name__ == "__main__":
         args.exp_name = os.path.basename(__file__)[: -len(".py")]
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     modifs_list = [i for i in args.modifs.split(" ") if i]
-    _, writer_dir, postfix = init_wandb(args, job_type="eval")
+    m = re.search(r'run_id([A-Za-z0-9]+)(?=[^A-Za-z0-9]|$)', args.agent_path)
+    if m:
+        args.wandb_run_id = m.group(1)
     ckpt = torch.load(args.agent_path, map_location=torch.device("cpu"))
     model_args = ckpt["args"]
     args.her = model_args["her"]
     args.num_envs = 1
+    args.wandb_dir = model_args["wandb_dir"]
+    args.wandb_project_name = model_args["wandb_project_name"]
+    args.wandb_entity = model_args["wandb_entity"]
+    args.wandb_run_name = model_args["wandb_run_name"]
+    _, writer_dir, postfix = init_wandb(args, job_type="eval")
+
     env = SubprocVecEnv(
         [
             make_env(
@@ -55,10 +63,10 @@ if __name__ == "__main__":
     if args.track:
         import wandb
 
-        wandb.log({"FinalReward": mean_reward})
+        wandb.log({f"{args.modifs}/FinalReward_eval": mean_reward})
         if args.capture_video:
             list_of_videos = glob.glob(f"{writer_dir}/media/videos/*.mp4")
             latest_video = max(list_of_videos, key=os.path.getctime)
-            wandb.log({"video_eval": wandb.Video(latest_video)})
+            wandb.log({f"{args.modifs}/video_eval": wandb.Video(latest_video)})
         wandb.finish()
     env.close()

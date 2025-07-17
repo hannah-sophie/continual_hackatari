@@ -1,15 +1,27 @@
 {
-    "modification_factory": "SequentialModificationFactory",
+    "modification_factory": "EpsCombinedModificationFactory",
     "modification_factory_kwargs": {
-        "num_total_steps": 10000,
-        "modifications": [
-            "stop_all_cars_edge",
-            "all_cars_black",
-            ""
-        ],
-        "switching_thresholds": [2000, 4000]
+        "modification_factory_kwargs": {
+            "SequentialModificationFactory": {
+                "num_total_steps": 1000,
+                "modifications": ["disable_cars"],
+                "switching_thresholds": []
+            },
+            "AllCombinationsRandomModificationFactory": {
+                "num_total_steps": 1000,
+                "modifications": [
+                    [
+                        "all_green_cars",
+                        "all_pink_cars",
+                        "all_white_cars",
+                        "all_blue_cars"
+                    ],
+                    ["", "reverse_car_speed_bottom", "reverse_car_speed_top"]
+                ],
+                "num_repetitions": 20
+            }
+        },
+        "epsilon": 0.005
+
     }
 }
-
-
-
