@@ -92,20 +92,30 @@ class RandomModificationFactory(ModificationFactory):
         self,
         num_total_steps,
         modifications: List[str],
+        probabilities: List[float] = None,
         num_repetitions: int = 1,
     ):
         super().__init__(num_total_steps)
+        if probabilities is None:
+            probabilities = [1.0 / len(modifications)] * len(modifications)
+        assert len(modifications) == len(
+            probabilities
+        ), "Number of modifications must match number of probabilities."
+        assert np.isclose(sum(probabilities), 1.0), "Probabilities must sum to 1."
         self.modifications = modifications
         self.num_repetitions = num_repetitions
         self.current_repetitions = 0
         self.current_modification = np.random.choice(self.modifications)
+        self.probabilities = probabilities
 
     def get_modification(self, step):
         assert (
             step < self.num_total_steps
         ), "Step must be less than the total number of steps."
         if self.current_repetitions >= self.num_repetitions:
-            self.current_modification = np.random.choice(self.modifications)
+            self.current_modification = np.random.choice(
+                self.modifications, p=self.probabilities
+            )
             self.current_repetitions = 0
         else:
             self.current_repetitions += 1
