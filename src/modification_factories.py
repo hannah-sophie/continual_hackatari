@@ -98,6 +98,7 @@ class RandomModificationFactory(ModificationFactory):
         super().__init__(num_total_steps)
         if probabilities is None:
             probabilities = [1.0 / len(modifications)] * len(modifications)
+
         assert len(modifications) == len(
             probabilities
         ), "Number of modifications must match number of probabilities."
@@ -136,11 +137,13 @@ class AllCombinationsRandomModificationFactory(RandomModificationFactory):
         self,
         num_total_steps,
         modifications: List[List[str]],
+        probabilities: List[float] = None,
         num_repetitions: int = 1,
     ):
         super().__init__(
             num_total_steps,
             [" ".join(list(m)) for m in itertools.product(*modifications)],
+            probabilities,
             num_repetitions,
         )
 
