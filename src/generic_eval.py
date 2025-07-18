@@ -9,6 +9,8 @@ class EvalArgs(Args):
     """Path to the agent to be evaluated"""
     eval_episodes: int = 21
     """Number of episodes for evaluation"""
+    wandb_run_id: str|None = None
+    "Run id for wandb"
 
 
 def evaluate(agent, env, eval_episodes: int, device,  her:bool=False):
