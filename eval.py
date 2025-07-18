@@ -30,7 +30,7 @@ if __name__ == "__main__":
     args.wandb_dir = model_args["wandb_dir"]
     args.wandb_project_name = model_args["wandb_project_name"]
     args.wandb_entity = model_args["wandb_entity"]
-    args.wandb_run_name = model_args["wandb_run_name"]
+    args.wandb_run_name = None
     _, writer_dir, postfix = init_wandb(args, job_type="eval")
 
     env = SubprocVecEnv(
