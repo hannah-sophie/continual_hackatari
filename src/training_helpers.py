@@ -166,6 +166,8 @@ class TrainArgs(Args):
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
 
+    deactivate_episodic_life: bool = False
+    """If toggled episodic life is deactivated"""
 
 # Function to create a gym environment with the specified settings
 def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
@@ -219,7 +221,8 @@ def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):
         # Apply standard Atari environment wrappers
 
         env = NoopResetEnv(env, noop_max=30)
-        env = EpisodicLifeEnv(env)
+        if args.deactivate_episodic_life is False:
+            env = EpisodicLifeEnv(env)
         action_meanings = [
             ale_py.Action(a).name for a in env.unwrapped.ale.getMinimalActionSet()
         ]
