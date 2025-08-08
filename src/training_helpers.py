@@ -102,6 +102,8 @@ class Args:
     game_specific_goals: bool = False
     """if toggled game specific goals and reward functions (if defined) are used for HER; otherwise rewards are used as goals"""
 
+    deactivate_episodic_life: bool = False
+    """If toggled episodic life is deactivated"""
 
 @dataclass
 class TrainArgs(Args):
@@ -165,9 +167,6 @@ class TrainArgs(Args):
     """the mini-batch size (computed in runtime)"""
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
-
-    deactivate_episodic_life: bool = False
-    """If toggled episodic life is deactivated"""
 
 # Function to create a gym environment with the specified settings
 def make_env(env_id, idx, capture_video, run_dir, args, modifs=""):

@@ -32,7 +32,7 @@ if __name__ == "__main__":
     args.wandb_entity = model_args["wandb_entity"]
     args.wandb_run_name = None
     _, writer_dir, postfix = init_wandb(args, job_type="eval")
-
+    args.deactivate_episodic_life = True
     env = SubprocVecEnv(
         [
             make_env(
