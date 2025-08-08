@@ -23,6 +23,7 @@ class GoalConditionedEnv(VecEnvWrapper):
             observation_space=venv.observation_space,
             action_space=venv.action_space,
         )
+        env_id = env_id.replace("ALE/", "").split("-")[0]
         self.her_wrapper = HerWrapper(self, env_id, num_envs)
         self.game_name = env_id.lower()
         if game_specific_goals:
