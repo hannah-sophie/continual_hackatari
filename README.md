@@ -112,6 +112,22 @@ Example from `run_config.json` for `EpsCombinedModificationFactory`:
 }
 ```
 
+**Custom Modification Factories**
+
+To add your own curriculum/scheduling mechansim:
+
+1) **Implement** a class in `modification_factories.py` that:
+   - accepts `num_total_steps` (plus any kwargs) in `__init__`,
+   - exposes `get_modification(step: int) -> str` returning a **single, space-separated** modification string (or `""` for no change),
+
+2) **Register** it in the `modification_factory_mapping` (key = class name, value = class).
+
+3) **Reference** it from `run_config.json`:
+   ```json
+   {
+     "modification_factory": "MyFactory",
+     "modification_factory_kwargs": { "num_total_steps": 200000, "...": "..." }
+   }
 #### Hindsight Experience Replay (HER)
 
 Re‑label transitions with **achieved goals** (i.e., `final` strategy of HER) → stronger learning signal for **sparse‑reward** Atari tasks.
