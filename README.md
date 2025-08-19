@@ -1,4 +1,4 @@
-# Readme AI Lab
+# Continual Hackatari
 
 > Continual RL for **Atari** with environment **modifications**, **goal‑conditioned learning (HER)**, and **Continual Backpropagation (CBP)**. Train robust agents that adapt as the game dynamics or visuals change.
 
@@ -149,6 +149,7 @@ At each factory **switch**, multiplicatively **shrink** policy weights and add s
 `shrink_factor`: float = 0.7   – the factor by which the agent's weights will be shrunk
 
 `noise_scale`: float = 0.01  – the scale of the noise to be added to the agent's weights
+
 ---
 
 ### 3.2 `eval.py`
