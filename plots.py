@@ -218,6 +218,25 @@ eval_names = [
 ]
 plot_bars(groups, eval_cols, eval_names, (6, 3), (0, 41))
 # %%
+# Pong Baseline
+eval_cols = [
+    "FinalReward",
+    "lazy_enemy/FinalReward_eval",
+    "parallel_enemy/FinalReward_eval",
+    "random_perturbation_enemy/FinalReward_eval",
+]
+eval_names = [
+    "Baseline",
+    "Lazy enemy",
+    "Parallel enemy",
+    "Lazy enemy",
+]
+plot_bars(
+    ["Pong-v5 baseline"], eval_cols, eval_names, (6, 3), (-21, 21), "pong_baseline"
+)
+
+
+# %%
 # Pong enemy behavior
 eval_cols = [
     "FinalReward",
@@ -319,6 +338,32 @@ plot_bars(
     (-21, 21),
     "pong_enemy_combinations_random_pertubation_enemy",
 )
+
+# %%
+# Breakout Baseline
+eval_cols = [
+    "FinalReward",
+    "color_all_blocks_red/FinalReward_eval",
+    "strobo_mode_blocks_no_black/FinalReward_eval",
+    "color_player_and_ball_red/FinalReward_eval",
+    "strobo_mode_player_and_ball_no_black/FinalReward_eval",
+]
+eval_names = [
+    "Baseline",
+    "All blocks red",
+    "Strobo mode blocks no black",
+    "Player and ball red",
+    "Strobo mode player and ball no black",
+]
+plot_bars(
+    ["Breakout-v5 baseline"],
+    eval_cols,
+    eval_names,
+    (6, 3),
+    (0, 400),
+    "breakout_baseline",
+)
+
 # %%
 # Breakout
 groups = ["Breakout-v5 baseline", "Breakout-v5 Colors", "Breakout-v5 Color blocks"]
