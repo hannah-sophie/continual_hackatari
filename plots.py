@@ -27,6 +27,7 @@ def plot_bars(groups, metrics, metrics_names, figsize, xlim, figname=None):
         data=data_melted[
             (data_melted["Group"].isin(groups)) & (data_melted["Metric"].isin(metrics))
         ],
+        order=metrics,
         hue_order=groups,
         x="Value",
         y="Metric",
@@ -232,7 +233,7 @@ eval_names = [
     "Lazy enemy",
 ]
 plot_bars(
-    ["Pong-v5 baseline"], eval_cols, eval_names, (6, 3), (-21, 21), "pong_baseline"
+    ["Pong-v5 baseline"], eval_cols, eval_names, (6, 3), (-21, 21), "pong"
 )
 
 
@@ -342,26 +343,28 @@ plot_bars(
 # %%
 # Breakout Baseline
 eval_cols = [
-    "FinalReward",
+    "/FinalReward_eval",
     "color_all_blocks_red/FinalReward_eval",
-    "strobo_mode_blocks_no_black/FinalReward_eval",
     "color_player_and_ball_red/FinalReward_eval",
+    "strobo_mode_blocks_no_black/FinalReward_eval",
     "strobo_mode_player_and_ball_no_black/FinalReward_eval",
 ]
 eval_names = [
     "Baseline",
     "All blocks red",
-    "Strobo mode blocks no black",
     "Player and ball red",
-    "Strobo mode player and ball no black",
+    "Strobo mode blocks",
+    "Strobo mode player and ball",
 ]
+
+
 plot_bars(
     ["Breakout-v5 baseline"],
     eval_cols,
     eval_names,
     (6, 3),
     (0, 400),
-    "breakout_baseline",
+    "breakout",
 )
 
 # %%
