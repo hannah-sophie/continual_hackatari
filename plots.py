@@ -190,14 +190,18 @@ groups = [
     "Freeway-v5 vary_car_speeds",
     "Freeway-v5 Colors and vary_car_speeds",
 ]
-plot_bars(groups, eval_cols, eval_names, (6, 3), (0, 41))
+plot_bars(
+    groups, eval_cols, eval_names, (6, 3), (0, 41), "freeway_vary_car_speeds_baseline"
+)
 eval_cols = [
     "vary_car_speeds/FinalReward_eval",
 ]
 eval_names = [
     "Vary car speeds",
 ]
-plot_bars(groups, eval_cols, eval_names, (6, 3), (0, 41))
+plot_bars(
+    groups, eval_cols, eval_names, (6, 3), (0, 41), "freeway_vary_car_speeds_eval"
+)
 eval_cols = [
     "all_black_cars/FinalReward_eval",
     "all_red_cars/FinalReward_eval",
@@ -206,7 +210,9 @@ eval_names = [
     "All black cars",
     "All red cars",
 ]
-plot_bars(groups, eval_cols, eval_names, (6, 3), (0, 41))
+plot_bars(
+    groups, eval_cols, eval_names, (6, 3), (0, 41), "freeway_vary_car_speeds_colors"
+)
 eval_cols = [
     "stop_all_cars/FinalReward_eval",
     "stop_all_cars_edge/FinalReward_eval",
@@ -217,7 +223,9 @@ eval_names = [
     "Stop all cars on edge",
     "Disable cars",
 ]
-plot_bars(groups, eval_cols, eval_names, (6, 3), (0, 41))
+plot_bars(
+    groups, eval_cols, eval_names, (6, 3), (0, 41), "freeway_vary_car_speeds_other_mods"
+)
 # %%
 # Pong Baseline
 eval_cols = [
@@ -232,9 +240,7 @@ eval_names = [
     "Parallel enemy",
     "Lazy enemy",
 ]
-plot_bars(
-    ["Pong-v5 baseline"], eval_cols, eval_names, (6, 3), (-21, 21), "pong"
-)
+plot_bars(["Pong-v5 baseline"], eval_cols, eval_names, (6, 3), (-21, 21), "pong")
 
 
 # %%
@@ -346,13 +352,17 @@ eval_cols = [
     "/FinalReward_eval",
     "color_all_blocks_red/FinalReward_eval",
     "color_player_and_ball_red/FinalReward_eval",
+    "color_all_blocks_green/FinalReward_eval",
+    "color_player_and_ball_green/FinalReward_eval",
     "strobo_mode_blocks_no_black/FinalReward_eval",
     "strobo_mode_player_and_ball_no_black/FinalReward_eval",
 ]
 eval_names = [
     "Baseline",
-    "All blocks red",
+    "All block red",
     "Player and ball red",
+    "All blocks green",
+    "Player and ball green",
     "Strobo mode blocks",
     "Strobo mode player and ball",
 ]
